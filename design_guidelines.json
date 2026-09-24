@@ -1,0 +1,85 @@
+{
+  "theme": "light",
+  "typography": {
+    "headings": "Manrope",
+    "body": "Figtree",
+    "notes": "Avoid generic fonts like Inter for headings. Use tracking-tight for H1 and H2. All headings should carry a premium, modern feel. Body text should be highly readable and neutral."
+  },
+  "colors": {
+    "primary": "#4F46E5",
+    "primary_hover": "#4338CA",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "success": "#10B981",
+    "success_bg": "#D1FAE5",
+    "error": "#F43F5E",
+    "error_bg": "#FFE4E6",
+    "task_card_bg": "#1E293B",
+    "task_card_text": "#F8FAFC",
+    "task_accent": "#F59E0B"
+  },
+  "visual_enhancers": {
+    "borders": "1px solid border-slate-200 for resting cards, border-primary/50 for active states.",
+    "shadows": "shadow-sm for resting cards, shadow-md for interactive elements, shadow-2xl with colored glow for the task card to make it pop.",
+    "border_radius": "rounded-3xl for primary surfaces/cards, rounded-full for buttons and pills to give a tactile, friendly mobile-app feel.",
+    "glassmorphism": "Use backdrop-blur-xl bg-white/70 for fixed header and bottom tab navigator. NEVER use fully transparent backgrounds under text."
+  },
+  "layouts": {
+    "app_structure": "Mobile-first approach. Wrap the main content in a container with `max-w-md mx-auto h-screen overflow-hidden bg-background shadow-2xl ring-1 ring-slate-200` to simulate a premium mobile app on desktop browsers.",
+    "spacing": "Generous padding. Use `p-6` or `p-8` inside cards. `gap-6` between major sections.",
+    "conversation_view": "Top: Fixed glass header with timer/exit. Middle: AI Orb pulsing/animating. Middle-Lower: Karaoke-style transcript (tappable words). Floating overlay: High-contrast Task Card blocking the view slightly so it cannot be missed. Bottom: Floating action area for Mic button."
+  },
+  "components": {
+    "TaskCard": "Crucial requirement. Must be visually distinct (Dark theme `#1E293B` on light mode) with large bold text. Add 'MONDD KI' or 'FORDÍTSD ANGOLRA' as an uppercase overline with `tracking-[0.2em] text-task_accent text-xs font-bold`. The sentence to say/translate should be `text-2xl`.",
+    "AI_Orb": "Animated speaking orb using Framer Motion. Pulsing concentric circles based on speaking state. Use a gradient of primary colors for the orb.",
+    "Transcript_Karaoke": "Current word highlighted in Primary color, past words `text-slate-800`, upcoming words `text-slate-400`. Words must be `span` elements wrapped in interactive buttons for tap-to-translate. Include subtle hover/tap states.",
+    "BottomNav": "Glassmorphic bottom bar with 4-5 icons (`lucide-react`). Active state has primary color icon and text, inactive is `text-slate-400`.",
+    "CorrectionChip": "Inline flex item with strike-through red (`text-error`) for wrong word, followed by green bold (`text-success`) for correct word, enclosed in a soft background pill.",
+    "WordLabCards": "Tinder-style swipeable cards for word matching. Use large typography, rounded-3xl corners, and smooth drag physics (Framer Motion)."
+  },
+  "motion": {
+    "transitions": "Use Framer Motion for Task Card popping in (spring animation: `scale 0.9` to `1`, stiffness 300). Layout transitions for transcript scrolling.",
+    "micro_interactions": "Tap on word -> slight scale down (`scale-95`) and background flash. Mic button pulse when recording."
+  },
+  "image_urls": {
+    "maya_teacher": {
+      "url": "https://images.unsplash.com/photo-1562337404-3044c84ac061?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHx3YXJtJTIwZnJpZW5kbHklMjB5b3VuZyUyMHdvbWFuJTIwcG9ydHJhaXQlMjBwb3J0cmFpdCUyMHNtaWxpbmd8ZW58MHx8fHwxNzkwMjM1NDU3fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Avatar for Maya (Warm personality)"
+    },
+    "james_teacher": {
+      "url": "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwxfHxmdW5ueSUyMHlvdW5nJTIwbWFuJTIwcG9ydHJhaXQlMjBzbWlsaW5nJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzkwMjM1NDU3fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Avatar for James (Funny personality)"
+    },
+    "karen_teacher": {
+      "url": "https://images.unsplash.com/photo-1758600433053-235139a44265?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxzdHJpY3QlMjBjb25maWRlbnQlMjBtYXR1cmUlMjB3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MDIzNTQ1N3ww&ixlib=rb-4.1.0&q=85",
+      "category": "Avatar for Karen (Sarcastic/Strict personality)"
+    },
+    "vinnie_teacher": {
+      "url": "https://images.unsplash.com/photo-1533101585792-27f81a845550?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHx0b3VnaCUyMHN0cm9uZyUyMG1hdHVyZSUyMG1hbiUyMHBvcnRyYWl0JTIwY29uZmlkZW50fGVufDB8fHx8MTc5MDIzNTQ1N3ww&ixlib=rb-4.1.0&q=85",
+      "category": "Avatar for Vinnie (Tough personality)"
+    }
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: Do not break or remove any existing logic, state management, or functional flows. Your job is to wrap the existing logic in a premium, perfect UI/UX.",
+    "Build a premium mobile-first web app. Enforce mobile-like container on desktop (`max-w-md mx-auto` with shadow) so it looks like a native app, not a generic dashboard.",
+    "Use Lucide-React for all icons.",
+    "Implement Framer Motion for the AI teacher orb, Task Card pop-ups, and Word Lab swipe cards.",
+    "DO NOT build a generic AI dashboard. The aesthetic should rival high-end apps like Duolingo or Headspace.",
+    "Ensure 'MONDD KI' and 'FORDÍTSD ANGOLRA' task cards are extremely prominent, popping out visually from the conversation flow so users know exactly what to do.",
+    "Make transcript words individually tappable.",
+    "All UI text is in Hungarian, while content to learn is English.",
+    "Configure Tailwind to use Manrope for headings and Figtree for body. Do not use Inter for headings.",
+    "Since the project uses JS, ensure all new component code is written in `.js` or `.jsx` (not `.tsx`)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic outputs. Break that habit: create a distinctive, premium frontend.",
+    "Do not apply universal 'transition: all', use specific transitions for performance and stability.",
+    "Do not center align the app text globally; left-align content for natural reading flow.",
+    "Use 2-3x more spacing than typical. Empty space is luxurious. `p-6` or `p-8` inside standard containers.",
+    "Use 'sonner' for toasts.",
+    "Prioritize Shadcn UI for standard elements, but heavily customize borders and radii to fit the rounded, soft-utility style.",
+    "Add 'data-testid' to all interactive and key informational elements."
+  ]
+}

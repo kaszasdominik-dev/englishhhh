@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 243 75% 59%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 350 89% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 243 75% 59%;
+  --radius: 1rem;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  background: #E8ECF4;
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, .font-heading { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+
+@layer base {
+  * { @apply border-border; }
+}
+
+/* Hide scrollbars inside the app shell for a native feel */
+.livo-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.livo-scroll::-webkit-scrollbar { display: none; }
+
+.text-balance { text-wrap: balance; }
+
+/* subtle grain / glass helpers */
+.glass { background: rgba(255,255,255,.72); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+/* orb */
+@keyframes orb-pulse { 0%,100% { transform: scale(1); opacity:.55 } 50% { transform: scale(1.12); opacity:.25 } }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+
+/* karaoke word tap */
+.kw { transition: color .18s ease, background-color .18s ease, transform .12s ease; border-radius: 6px; padding: 0 1px; cursor: pointer; }
+.kw:active { transform: scale(.94); }
+
+.shine { position: relative; overflow: hidden; }
+.shine::after { content:''; position:absolute; inset:0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shimmer 1.6s infinite; }
+
+@layer base {
+    [data-debug-wrapper="true"] { display: contents !important; }
+}

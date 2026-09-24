@@ -1,0 +1,302 @@
+{
+  "user": {
+    "id": "demo-user",
+    "name": "Dominik",
+    "email": "",
+    "locale": "hu-HU",
+    "timezone": "Europe/Budapest",
+    "onboarded": false
+  },
+  "profile": {
+    "cefr": "B1",
+    "goal": "munka",
+    "weeklyMinutes": 120,
+    "correctionStyle": "balanced",
+    "huHelp": "on_request",
+    "teacher": "james",
+    "interests": [
+      "vállalkozás",
+      "tech",
+      "zene"
+    ],
+    "focus": "Business English"
+  },
+  "subscription": {
+    "plan": "Próba",
+    "includedMinutes": 60,
+    "usedMinutes": 12,
+    "renewsAt": null
+  },
+  "vocabulary": [
+    {
+      "id": "v_1790083343969_2xalv",
+      "term": "so far",
+      "meaning": "eddig",
+      "example": "",
+      "mastery": 40,
+      "status": "uncertain",
+      "nextReview": "2026-09-23",
+      "attempts": 0,
+      "correct": 0,
+      "saved": true,
+      "savedAt": "2026-09-22T13:22:23.969Z",
+      "source": "live_lookup",
+      "sourceLanguage": "en"
+    },
+    {
+      "term": "deadline",
+      "meaning": "határidő",
+      "example": "We need to meet the deadline.",
+      "mastery": 86,
+      "status": "stable",
+      "nextReview": "2026-09-27",
+      "attempts": 5,
+      "correct": 4
+    },
+    {
+      "term": "revenue",
+      "meaning": "bevétel / árbevétel",
+      "example": "Our revenue grew ten percent this quarter.",
+      "mastery": 72,
+      "status": "learning",
+      "nextReview": "2026-09-24",
+      "attempts": 4,
+      "correct": 3
+    },
+    {
+      "term": "profit",
+      "meaning": "nyereség / profit",
+      "example": "Profit increased despite higher costs.",
+      "mastery": 82,
+      "status": "stable",
+      "nextReview": "2026-10-03",
+      "attempts": 4,
+      "correct": 4
+    },
+    {
+      "term": "despite",
+      "meaning": "annak ellenére",
+      "example": "Despite the rain, we went outside.",
+      "mastery": 76,
+      "status": "learning",
+      "nextReview": "2026-09-25",
+      "attempts": 4,
+      "correct": 3
+    },
+    {
+      "term": "budget",
+      "meaning": "költségkeret",
+      "example": "We need to stick to the budget.",
+      "mastery": 80,
+      "status": "stable",
+      "nextReview": "2026-10-01",
+      "attempts": 4,
+      "correct": 4
+    },
+    {
+      "term": "expenses",
+      "meaning": "költségek",
+      "example": "Our monthly expenses are too high.",
+      "mastery": 64,
+      "status": "learning",
+      "nextReview": "2026-09-23",
+      "attempts": 5,
+      "correct": 3
+    },
+    {
+      "term": "invoice",
+      "meaning": "számla",
+      "example": "We sent the invoice yesterday.",
+      "mastery": 94,
+      "status": "stable",
+      "nextReview": "2026-10-15",
+      "attempts": 5,
+      "correct": 5
+    },
+    {
+      "term": "client",
+      "meaning": "ügyfél",
+      "example": "The client asked for a discount.",
+      "mastery": 95,
+      "status": "stable",
+      "nextReview": "2026-10-15",
+      "attempts": 5,
+      "correct": 5
+    },
+    {
+      "term": "supplier",
+      "meaning": "beszállító",
+      "example": "We need to find a new supplier.",
+      "mastery": 90,
+      "status": "stable",
+      "nextReview": "2026-10-10",
+      "attempts": 5,
+      "correct": 5
+    },
+    {
+      "term": "negotiate",
+      "meaning": "tárgyalni / megtárgyalni",
+      "example": "We need to negotiate better terms.",
+      "mastery": 68,
+      "status": "learning",
+      "nextReview": "2026-09-24",
+      "attempts": 5,
+      "correct": 3
+    },
+    {
+      "term": "negotiation",
+      "meaning": "tárgyalás",
+      "example": "The negotiation took weeks.",
+      "mastery": 81,
+      "status": "stable",
+      "nextReview": "2026-10-04",
+      "attempts": 3,
+      "correct": 3
+    },
+    {
+      "term": "agenda",
+      "meaning": "napirend",
+      "example": "Let’s go through the agenda.",
+      "mastery": 77,
+      "status": "learning",
+      "nextReview": "2026-09-28",
+      "attempts": 4,
+      "correct": 3
+    },
+    {
+      "term": "contract",
+      "meaning": "szerződés",
+      "example": "We signed the contract yesterday.",
+      "mastery": 91,
+      "status": "stable",
+      "nextReview": "2026-10-10",
+      "attempts": 4,
+      "correct": 4
+    },
+    {
+      "term": "proposal",
+      "meaning": "javaslat / ajánlat",
+      "example": "They sent a new proposal this morning.",
+      "mastery": 55,
+      "status": "uncertain",
+      "nextReview": "2026-09-23",
+      "attempts": 6,
+      "correct": 3
+    },
+    {
+      "term": "feedback",
+      "meaning": "visszajelzés",
+      "example": "Thanks for the feedback.",
+      "mastery": 92,
+      "status": "stable",
+      "nextReview": "2026-10-14",
+      "attempts": 4,
+      "correct": 4
+    },
+    {
+      "term": "milestone",
+      "meaning": "mérföldkő",
+      "example": "We hit a major milestone.",
+      "mastery": 73,
+      "status": "learning",
+      "nextReview": "2026-09-26",
+      "attempts": 4,
+      "correct": 3
+    },
+    {
+      "term": "resource",
+      "meaning": "erőforrás",
+      "example": "We don’t have enough resources.",
+      "mastery": 74,
+      "status": "learning",
+      "nextReview": "2026-09-27",
+      "attempts": 4,
+      "correct": 3
+    },
+    {
+      "term": "stakeholder",
+      "meaning": "érintett / érdekelt fél",
+      "example": "We need to update all stakeholders.",
+      "mastery": 70,
+      "status": "learning",
+      "nextReview": "2026-09-26",
+      "attempts": 3,
+      "correct": 2
+    },
+    {
+      "term": "deliverable",
+      "meaning": "leadandó / átadandó eredmény",
+      "example": "The final deliverable is due Friday.",
+      "mastery": 35,
+      "status": "uncertain",
+      "nextReview": "2026-09-23",
+      "attempts": 5,
+      "correct": 2
+    },
+    {
+      "term": "compliance",
+      "meaning": "megfelelés",
+      "example": "We need to check compliance issues.",
+      "mastery": 48,
+      "status": "uncertain",
+      "nextReview": "2026-09-23",
+      "attempts": 3,
+      "correct": 1
+    }
+  ],
+  "grammar": [
+    {
+      "pattern": "take → took",
+      "title": "Past simple igealak",
+      "original": "It take months.",
+      "corrected": "It took months.",
+      "mastery": 58,
+      "trend": "improving",
+      "count": 5
+    },
+    {
+      "pattern": "grow → grew",
+      "title": "Past simple igealak",
+      "original": "Our revenue is grown ten percent.",
+      "corrected": "Our revenue grew ten percent.",
+      "mastery": 52,
+      "trend": "active",
+      "count": 4
+    },
+    {
+      "pattern": "he/she/it + -s",
+      "title": "Simple present 3. személy",
+      "original": "It take months.",
+      "corrected": "It takes months.",
+      "mastery": 67,
+      "trend": "improving",
+      "count": 3
+    }
+  ],
+  "homework": [
+    {
+      "id": "hw1",
+      "title": "Business mini role-play",
+      "detail": "Mondj 3 mondatot egy ügyfélnek a proposal, supplier és deadline szavakkal.",
+      "minutes": 4,
+      "done": false
+    },
+    {
+      "id": "hw2",
+      "title": "Past simple gyors ismétlés",
+      "detail": "Alkoss 5 rövid mondatot tegnapi eseményekről.",
+      "minutes": 3,
+      "done": false
+    }
+  ],
+  "sessions": [],
+  "stats": {
+    "totalMinutes": 94,
+    "weekMinutes": 38,
+    "weekDays": 3,
+    "streak": 7,
+    "stableWords": 8,
+    "learningWords": 9,
+    "uncertainWords": 3
+  }
+}
