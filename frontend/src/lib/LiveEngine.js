@@ -96,7 +96,7 @@ export class LiveEngine {
         if (e.streams && e.streams[0]) this.remoteStream = e.streams[0];
         else { if (!this.remoteStream) this.remoteStream = new MediaStream(); if (e.track) { try { this.remoteStream.addTrack(e.track); } catch {} } }
         if (a) {
-          try { a.srcObject = this.remoteStream; } catch {}
+          try { if (a.srcObject !== this.remoteStream) a.srcObject = this.remoteStream; } catch {}
           a.muted = false; a.autoplay = true; a.playsInline = true; a.volume = 1;
           const p = a.play();
           if (p && p.catch) p.catch(() => { this.needsAudioUnlock = true; this.notify(); });
