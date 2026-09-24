@@ -10,7 +10,7 @@ export function LiveRoom({ engine }) {
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
-      <audio id="livo-remote-audio" autoPlay />
+      <audio id="livo-remote-audio" autoPlay playsInline />
       <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-brand/30 blur-[90px]" />
 
       {/* Header */}
@@ -38,6 +38,11 @@ export function LiveRoom({ engine }) {
             <span className="text-xs text-slate-300">{s.status}</span>
             {s.preferenceBadge && <span className="text-[10px] font-bold bg-white/10 rounded-full px-2 py-0.5 text-slate-200">{s.preferenceBadge}</span>}
           </div>
+          {s.needsAudioUnlock && (
+            <button data-testid="live-unlock-audio" onClick={() => engine.unlockAudio()} className="mx-5 mt-1 rounded-full bg-amber-400 text-[#131A2B] text-xs font-bold py-2.5 flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+              <Volume2 size={14} /> Koppints ide a hang bekapcsolásához
+            </button>
+          )}
 
           {/* Orb */}
           <div className="flex justify-center py-4">
@@ -172,7 +177,7 @@ export function LiveRoom({ engine }) {
                   {s.phase === 'connecting' ? <span className="text-sm font-semibold">•••</span> : (s.error ? <RotateCcw size={26} /> : <Play size={30} className="ml-1" />)}
                 </button>
               ) : (
-                <button data-testid="live-mute" onClick={() => engine.toggleMute()} className={`h-20 w-20 rounded-full grid place-items-center shadow-card active:scale-95 transition-transform ${s.muted ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                <button data-testid="live-mute" onClick={() => { engine.unlockAudio(); engine.toggleMute(); }} className={`h-20 w-20 rounded-full grid place-items-center shadow-card active:scale-95 transition-transform ${s.muted ? 'bg-rose-500' : 'bg-emerald-500'}`}>
                   {s.muted ? <MicOff size={28} /> : <Mic size={28} />}
                 </button>
               )}

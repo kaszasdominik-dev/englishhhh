@@ -24,7 +24,7 @@ export class LiveEngine {
     this.finishing = false; this.error = null;
     this.timeline = []; this.lastByRole = {};
     this.assistantSpeaking = false; this.userSpeaking = false; this.serverSpeechActive = false;
-    this.orb = 'idle'; this.userEcho = '';
+    this.orb = 'idle'; this.userEcho = ''; this.remoteStream = null; this.needsAudioUnlock = false;
     this.practiceTarget = null; this.correction = null; this.pronunciation = null;
     this.wordCapture = null; this.wordPopover = null; this.notes = [];
     this.preferenceBadge = this.langMode === 'hu' ? 'HU · magyar mód' : '';
@@ -53,7 +53,7 @@ export class LiveEngine {
       phase: this.phase, mode: this.mode, teacher: this.teacher, sessionMinutes: this.sessionMinutes,
       status: this.status, connectionLabel: this.connectionLabel, connected: this.connected, muted: this.muted,
       autoPaused: this.autoPaused, timeLimitReached: this.timeLimitReached, finishing: this.finishing, error: this.error,
-      timeline: this.timeline, orb: this.orb, userEcho: this.userEcho, caption: this.caption,
+      timeline: this.timeline, orb: this.orb, userEcho: this.userEcho, needsAudioUnlock: this.needsAudioUnlock, caption: this.caption,
       practiceTarget: this.practiceTarget, correction: this.correction, pronunciation: this.pronunciation,
       wordCapture: this.wordCapture, wordPopover: this.wordPopover, notes: this.notes,
       preferenceBadge: this.preferenceBadge, understood: this.understood,
@@ -91,7 +91,17 @@ export class LiveEngine {
       this.stream = stream; this.startMicMonitor(stream);
       const pc = new RTCPeerConnection(); this.pc = pc;
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
-      pc.ontrack = (e) => { const a = this.audioEl(); if (a) { a.srcObject = e.streams[0]; a.muted = false; a.play().catch(() => {}); } };
+      pc.ontrack = (e) => {
+        const a = this.audioEl();
+        if (e.streams && e.streams[0]) this.remoteStream = e.streams[0];
+        else { if (!this.remoteStream) this.remoteStream = new MediaStream(); if (e.track) { try { this.remoteStream.addTrack(e.track); } catch {} } }
+        if (a) {
+          try { a.srcObject = this.remoteStream; } catch {}
+          a.muted = false; a.autoplay = true; a.playsInline = true; a.volume = 1;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => { this.needsAudioUnlock = true; this.notify(); });
+        }
+      };
       const dc = pc.createDataChannel('oai-events'); this.dc = dc;
       dc.addEventListener('message', (m) => this.handleEvent(m));
       dc.addEventListener('open', () => { this.connectionLabel = 'Kapcsolódva'; this.notify(); });
@@ -241,7 +251,15 @@ export class LiveEngine {
   }
 
   // ---------- audio ducking ----------
-  resumeAudio() { const a = this.audioEl(); if (!a || this.timeLimitReached || this.finishing || this.userSpeaking || this.serverSpeechActive) return; try { a.muted = false; a.play()?.catch?.(() => {}); } catch {} }
+  resumeAudio() {
+    const a = this.audioEl(); if (!a || this.timeLimitReached || this.finishing || this.userSpeaking || this.serverSpeechActive) return;
+    try { if (this.remoteStream && a.srcObject !== this.remoteStream) a.srcObject = this.remoteStream; a.muted = false; a.playsInline = true; const p = a.play(); if (p && p.catch) p.catch(() => { this.needsAudioUnlock = true; this.notify(); }); } catch {}
+  }
+  unlockAudio() {
+    const a = this.audioEl(); this.needsAudioUnlock = false;
+    if (a) { try { if (this.remoteStream) a.srcObject = this.remoteStream; a.muted = false; a.volume = 1; a.playsInline = true; a.play()?.catch?.(() => {}); } catch {} }
+    this.notify();
+  }
   pauseAudioForLearner() { const a = this.audioEl(); if (!a) return; if (this.assistantSpeaking) { try { a.pause(); } catch {} this.status = 'Hallgatlak…'; this.orb = 'listening'; } }
 
   // ---------- karaoke ----------
