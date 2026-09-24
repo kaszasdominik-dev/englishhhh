@@ -1,11 +1,12 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TEACHERS, MODE_NAMES, formatClock } from '@/lib/livo';
-import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles } from 'lucide-react';
+import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
+import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark } from 'lucide-react';
 
 export function LiveRoom({ engine }) {
   const s = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   const t = TEACHERS[s.teacher] || TEACHERS.james;
+  const [showTranscript, setShowTranscript] = useState(false);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
@@ -154,13 +155,18 @@ export function LiveRoom({ engine }) {
             )}
           </AnimatePresence>
 
+          {/* Live transcript pull-down panel */}
+          <AnimatePresence>
+            {showTranscript && <TranscriptPanel s={s} engine={engine} teacher={t} onClose={() => setShowTranscript(false)} />}
+          </AnimatePresence>
+
           {/* Error */}
           {s.error && s.phase !== 'live' && <div className="mx-5 mb-2 text-center text-sm text-rose-300">{s.error}</div>}
 
           {/* Controls */}
           <div className="relative px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
             <div className="flex items-center justify-center gap-6">
-              <button className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-slate-300 active:scale-90 transition-transform" title="Transcript" disabled>≡</button>
+              <button data-testid="live-transcript-toggle" onClick={() => setShowTranscript(v => !v)} className={`h-12 w-12 rounded-full grid place-items-center active:scale-90 transition-transform ${showTranscript ? 'bg-brand text-white' : 'bg-white/10 text-slate-300'}`} title="Átirat"><ScrollText size={20} /></button>
               {!s.connected ? (
                 <button data-testid="live-connect" onClick={() => engine.connect()} disabled={s.phase === 'connecting'} className="h-20 w-20 rounded-full bg-brand grid place-items-center shadow-card active:scale-95 transition-transform disabled:opacity-70">
                   {s.phase === 'connecting' ? <span className="text-sm font-semibold">•••</span> : (s.error ? <RotateCcw size={26} /> : <Play size={30} className="ml-1" />)}
@@ -303,3 +309,85 @@ function SummaryModal({ s, engine }) {
 }
 const Stat = ({ b, l }) => <div className="rounded-xl bg-white/10 py-2 text-center"><div className="font-heading font-extrabold text-lg">{b}</div><div className="text-[10px] text-slate-400">{l}</div></div>;
 const Section = ({ title, children }) => <section className="mt-5"><div className="text-[11px] tracking-widest font-bold text-ink-mute mb-2">{title}</div>{children}</section>;
+
+
+const stripEdge = (w) => w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, '');
+
+function TranscriptPanel({ s, engine, teacher, onClose }) {
+  const [sel, setSel] = useState({ turnId: null, idx: [] });
+  const turns = s.timeline.filter(x => normalizeSpeechText(x.text));
+  const activeTurn = turns.find(x => x.id === sel.turnId);
+  const activeWords = activeTurn ? normalizeSpeechText(activeTurn.text).split(/\s+/) : [];
+  const selPhrase = stripEdge(sel.idx.map(i => activeWords[i]).join(' '));
+
+  const toggle = (turn, i) => {
+    setSel(prev => {
+      if (prev.turnId !== turn.id) return { turnId: turn.id, idx: [i] };
+      const has = prev.idx.includes(i);
+      const idx = has ? prev.idx.filter(x => x !== i) : [...prev.idx, i].sort((a, b) => a - b);
+      return { turnId: idx.length ? turn.id : null, idx };
+    });
+  };
+  const clear = () => setSel({ turnId: null, idx: [] });
+  const save = () => {
+    const phrase = selPhrase; if (!phrase) return;
+    if (sel.idx.length >= 2) engine.lookupPhrase(phrase, activeTurn?.text || phrase);
+    else engine.lookupWord(phrase, activeTurn?.text || phrase);
+    clear();
+  };
+
+  return (
+    <motion.div
+      data-testid="transcript-panel"
+      initial={{ y: '-100%', opacity: 0.4 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '-100%', opacity: 0.4 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+      drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={0.2}
+      onDragEnd={(e, info) => { if (info.offset.y < -80) onClose(); }}
+      className="absolute inset-x-0 top-[64px] bottom-[104px] z-[15] mx-3 rounded-[1.5rem] bg-[#0B1120]/95 ring-1 ring-white/10 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="px-4 pt-3 pb-2 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-slate-200"><ScrollText size={16} /><b className="text-sm">Élő átirat</b></div>
+        <button data-testid="transcript-close" onClick={onClose} className="h-7 w-7 grid place-items-center rounded-full bg-white/10 text-slate-300"><X size={14} /></button>
+      </div>
+      <div className="px-4 py-1 text-[11px] text-slate-500">Koppints egymás után több szóra egy soron belül → kifejezésként mentheted.</div>
+
+      <div className="flex-1 overflow-y-auto livo-scroll px-4 pb-3 space-y-3">
+        {turns.length === 0 && <div className="text-center text-sm text-slate-500 py-10">Amint elindul a beszélgetés, itt jelenik meg a teljes átirat.</div>}
+        {turns.map((turn) => {
+          const words = normalizeSpeechText(turn.text).split(/\s+/).filter(Boolean);
+          const isUser = turn.role === 'user';
+          return (
+            <div key={turn.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${isUser ? 'bg-brand/25 ring-1 ring-brand/30' : 'bg-white/[0.06] ring-1 ring-white/10'}`}>
+                <div className={`text-[10px] font-bold tracking-widest mb-1 ${isUser ? 'text-brand-ring' : 'text-slate-400'}`}>{isUser ? 'TE' : (teacher.name || 'TANÁR').toUpperCase()}</div>
+                <p className="text-[15px] leading-relaxed flex flex-wrap gap-x-1 gap-y-0.5">
+                  {words.map((w, i) => {
+                    const active = sel.turnId === turn.id && sel.idx.includes(i);
+                    return (
+                      <span key={i} data-testid={isUser ? undefined : (turn.id === turns.find(x => x.role !== 'user')?.id && i === 0 ? 'transcript-word' : undefined)}
+                        onClick={() => toggle(turn, i)}
+                        className={`kw ${active ? 'bg-brand text-white' : (isUser ? 'text-slate-100' : 'text-slate-200')}`}>{w}</span>
+                    );
+                  })}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <AnimatePresence>
+        {sel.idx.length > 0 && selPhrase && (
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="border-t border-white/10 bg-[#0B1120] px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-slate-500">KIJELÖLT KIFEJEZÉS</div>
+              <b className="text-sm text-white truncate block">{selPhrase}</b>
+            </div>
+            <button onClick={clear} className="text-xs text-slate-400 px-2">Törlés</button>
+            <button data-testid="transcript-save-phrase" onClick={save} className="inline-flex items-center gap-1.5 rounded-full bg-brand text-white text-sm font-semibold px-4 py-2 active:scale-95 transition-transform"><Bookmark size={14} /> Mentés</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div className="flex justify-center py-1.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
+    </motion.div>
+  );
+}
