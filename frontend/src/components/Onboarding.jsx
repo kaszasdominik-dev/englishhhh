@@ -11,7 +11,7 @@ export function Onboarding({ onDone }) {
 
   const finish = async () => {
     await saveProfile({ profile: { teacher, learningPath: path }, user: { onboarded: true } }, true);
-    onDone(path === 'guided' ? 'free' : 'free');
+    onDone('free');
   };
 
   return (

@@ -67,7 +67,7 @@ function Root() {
           {view === 'progress' && <ProgressView data={data} />}
           {view === 'profile' && <ProfileView onTeacher={() => setTeacherSheet(true)} />}
         </main>
-        <BottomNav view={view} setView={setView} openLive={() => { setView('practice'); }} onMic={() => openLive(data?.profile?.focus === 'Business English' ? 'business' : 'business')} />
+        <BottomNav view={view} setView={setView} openLive={() => { setView('practice'); }} onMic={() => openLive('business')} />
 
         {teacherSheet && <TeacherSheet engine={engine} liveOpen={liveOpen} onClose={() => setTeacherSheet(false)} />}
         {liveOpen && <LiveRoom engine={engine} />}
