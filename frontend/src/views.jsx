@@ -210,71 +210,65 @@ function WordLab({ data, onPlay }) {
   const [custom, setCustom] = useState('');
   const [count, setCount] = useState(10);
   const [busy, setBusy] = useState(false);
-  const [pack, setPack] = useState([]);
-  const gen = async () => {
+  const games = [['swipe', 'Swipe Match', 'Húzd a jó jelentés felé'], ['image', 'Kép → szó', 'Találd ki a kép szavát'], ['quick', 'Gyors kör', 'Feleletválasztós'], ['match', 'Párosító', 'Kösd össze a párokat'], ['memory', 'Memory', 'Memóriajáték']];
+  const label = normalizeSpeechText(custom || topic) || 'Random';
+  const launch = async (id) => {
+    if (busy) return;
     const chosen = normalizeSpeechText(custom || topic).slice(0, 80);
-    setBusy(true); setPack([]);
+    setBusy(id);
     try {
-      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data.profile?.cefr || 'B1', count }) });
-      const words = Array.isArray(r.words) ? r.words : [];
-      if (words.length < 4) throw new Error('Túl kevés új szó.');
-      setPack(words); toast.success(`${words.length} új szó kész.`);
+      const need = id === 'image' ? Math.max(count, 12) : count;
+      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data.profile?.cefr || 'B1', count: need, forImages: id === 'image' }) });
+      let words = Array.isArray(r.words) ? r.words : [];
+      if (id === 'image') words = words.filter(w => w.imageable);
+      if (words.length < 4) throw new Error(id === 'image' ? 'Ehhez a témához most nem találtam elég képes szót. Válassz tárgyiasabb témát (pl. konyha, sport, utazás, állatok).' : 'Túl kevés új szó ehhez a témához. Próbálj mást vagy Randomot.');
+      onPlay(words, chosen || 'Random', id);
     } catch (e) { toast.error(e.message || 'Nem sikerült szócsomagot készíteni.'); }
     finally { setBusy(false); }
   };
-  const ready = !busy && pack.length >= 4;
-  const games = [['swipe', 'Swipe Match'], ['image', 'Kép → szó'], ['quick', 'Gyors kör'], ['match', 'Párosító'], ['memory', 'Memory']];
   return (
     <div className="space-y-4">
       <div className="rounded-[1.35rem] bg-task-bg text-task-text p-5 shadow-card">
         <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">WORD LAB · ÚJ SZAVAK</span>
-        <h3 className="font-heading font-bold text-lg mt-1 leading-tight">Tanulj szavakat, amik még nincsenek a szóbankodban.</h3>
-        <p className="text-sm text-slate-300 mt-1">Válassz témát, a LIVO friss szókincset állít össze. A listát játék előtt átnézheted.</p>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto livo-scroll">
-        {TOPICS.map(tp => (
-          <button key={tp || 'random'} onClick={() => { setTopic(tp); setCustom(''); }} className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${topic === tp && !custom ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{tp || '✦ Random'}</button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <input data-testid="wordlab-topic" value={custom} onChange={e => setCustom(e.target.value)} placeholder="Saját téma, pl. ingatlan, sport…" className="flex-1 rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
-        <button data-testid="wordlab-generate" onClick={gen} disabled={busy} className="rounded-full bg-brand text-white px-4 text-sm font-semibold disabled:opacity-60 inline-flex items-center gap-1">
-          {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-        </button>
-      </div>
-      <div className="flex gap-2">
-        {[5, 10, 15, 20, 30].map(n => (
-          <button key={n} onClick={() => setCount(n)} className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${count === n ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{n}</button>
-        ))}
-      </div>
-
-      <div className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-100 min-h-[80px]">
-        {busy && <div className="text-center py-6 text-sm text-ink-mute inline-flex items-center gap-2 w-full justify-center"><Loader2 size={16} className="animate-spin" /> Releváns szavakat válogatok…</div>}
-        {!busy && !pack.length && <div className="text-center py-6 text-sm text-ink-faint">Még nincs aktív szócsomag. Válassz témát és generálj.</div>}
-        {!busy && pack.length > 0 && (
-          <div className="space-y-1.5">
-            {pack.map((w, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                <div className="flex-1 min-w-0"><b className="text-sm text-ink">{w.term}</b><span className="text-xs text-ink-mute ml-2">{w.meaning}</span></div>
-                {w.imageable && <span className="text-[9px] font-bold text-emerald2 bg-emerald2-bg rounded-full px-2 py-0.5">képes</span>}
-                <button onClick={() => setPack(pack.filter((_, j) => j !== i))} className="text-ink-faint hover:text-rose2"><Trash2 size={14} /></button>
-              </div>
-            ))}
-          </div>
-        )}
+        <h3 className="font-heading font-bold text-lg mt-1 leading-tight">Válassz témát, majd indíts egy játékot.</h3>
+        <p className="text-sm text-slate-300 mt-1">A szavakat élőben állítom össze a témádhoz — és nem lövöm le előre, mit fogsz kapni. 😉</p>
       </div>
 
       <div>
-        <h4 className="font-heading font-bold text-ink text-sm mb-2">Válassz játékot ehhez a csomaghoz</h4>
-        <div className="grid grid-cols-2 gap-2">
-          {games.map(([id, label]) => (
-            <button key={id} data-testid={`game-${id}`} disabled={!ready} onClick={() => onPlay(pack, custom || topic, id)} className={`rounded-2xl p-4 text-left shadow-soft ring-1 transition-all active:scale-[.97] ${ready ? 'bg-white ring-slate-100 text-ink' : 'bg-slate-100 ring-slate-100 text-ink-faint opacity-60'}`}>
-              <div className="font-heading font-bold text-sm">{label}</div>
-              <div className="text-[11px] text-ink-mute mt-0.5">{ready ? '2–4 perc →' : 'kell szócsomag'}</div>
-            </button>
+        <div className="text-xs font-semibold text-ink-mute mb-2">Téma</div>
+        <div className="flex gap-2 overflow-x-auto livo-scroll pb-1">
+          {TOPICS.map(tp => (
+            <button key={tp || 'random'} onClick={() => { setTopic(tp); setCustom(''); }} className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${topic === tp && !custom ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{tp || '✦ Random'}</button>
           ))}
         </div>
+        <input data-testid="wordlab-topic" value={custom} onChange={e => { setCustom(e.target.value); setTopic(''); }} placeholder="…vagy írd be a saját témád (pl. ingatlan, főzés)" className="mt-2 w-full rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold text-ink-mute mb-2">Hány szó legyen?</div>
+        <div className="flex gap-2">
+          {[5, 10, 15, 20, 30].map(n => (
+            <button key={n} onClick={() => setCount(n)} className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${count === n ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-heading font-bold text-ink text-sm">Indíts egy játékot ehhez: <span className="text-brand">{label}</span></h4>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {games.map(([id, title, sub]) => {
+            const loading = busy === id;
+            return (
+              <button key={id} data-testid={`game-${id}`} disabled={!!busy} onClick={() => launch(id)} className={`relative rounded-2xl p-4 text-left shadow-soft ring-1 ring-slate-100 bg-white text-ink transition-all active:scale-[.97] disabled:opacity-60 ${loading ? 'ring-2 ring-brand' : ''}`}>
+                <div className="font-heading font-bold text-sm flex items-center gap-1.5">{title}{loading && <Loader2 size={13} className="animate-spin text-brand" />}</div>
+                <div className="text-[11px] text-ink-mute mt-0.5">{loading ? 'Szavakat állítok össze…' : sub}</div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-ink-faint mt-2 text-center">A „Kép → szó" tárgyiasabb témákkal működik a legjobban.</p>
       </div>
     </div>
   );

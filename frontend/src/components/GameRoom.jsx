@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
 import { shuffle, uniqueBy, normalizeSpeechText } from '@/lib/livo';
-import { X, Heart, ArrowRight, Loader2, RotateCcw, Plus } from 'lucide-react';
+import { X, Heart, ArrowRight, Loader2, RotateCcw, Plus, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const GAMES = [['swipe', 'Swipe'], ['image', 'Kép'], ['quick', 'Gyors'], ['match', 'Párosító'], ['memory', 'Memory']];
@@ -117,31 +117,57 @@ function Quick({ words, round, setRound, correct, wrong, hearts, total, setDone,
 
 function Swipe({ words, round, setRound, correct, wrong, hearts, total, setDone, setFeedback }) {
   const pool = useMemo(() => shuffle(words).slice(0, total), [words, total]);
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-180, 180], [-16, 16]);
+  const leftGlow = useTransform(x, [-120, -25], [1, 0]);
+  const rightGlow = useTransform(x, [25, 120], [0, 1]);
+  const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
   const target = pool[round];
   const wrongW = useMemo(() => (target ? shuffle(words.filter(w => w !== target && norm(w.meaning) !== norm(target.meaning)))[0] : null), [round, target, words]);
   const choices = useMemo(() => shuffle([{ v: target?.meaning, ok: true }, { v: wrongW?.meaning || '—', ok: false }]), [round, target, wrongW]);
-  useEffect(() => setLocked(false), [round]);
+  useEffect(() => { x.set(0); setResult(null); setLocked(false); }, [round, x]);
   useEffect(() => { if (round >= total || round >= pool.length) { const id = setTimeout(() => setDone(true), 0); return () => clearTimeout(id); } }, [round, total, pool.length, setDone]);
   if (!target) return null;
   const commit = (side) => {
     if (locked) return; setLocked(true);
     const ok = choices[side === 'left' ? 0 : 1].ok;
-    if (ok) { correct(); setFeedback({ kind: 'good', text: `${target.term} = ${target.meaning}` }); } else { wrong(); setFeedback({ kind: 'bad', text: `Nem · ${target.term} = ${target.meaning}` }); }
-    setTimeout(() => { if (hearts > 0 || ok) setRound(r => r + 1); }, 700);
+    setResult(ok ? 'good' : 'bad');
+    animate(x, side === 'left' ? -260 : 260, { duration: 0.28, ease: 'easeIn' });
+    if (ok) { correct(); setFeedback({ kind: 'good', text: `✓ ${target.term} = ${target.meaning}` }); } else { wrong(); setFeedback({ kind: 'bad', text: `✕ ${target.term} = ${target.meaning}` }); }
+    setTimeout(() => { if (hearts > 0 || ok) setRound(r => r + 1); }, 620);
+  };
+  const onDragEnd = (e, info) => {
+    if (locked) return;
+    if (info.offset.x < -85 || info.velocity.x < -450) commit('left');
+    else if (info.offset.x > 85 || info.velocity.x > 450) commit('right');
+    else animate(x, 0, { type: 'spring', stiffness: 500, damping: 32 });
   };
   return (
     <div>
-      <div className="text-center mb-4"><small className="text-slate-400 text-xs">HÚZD A KÁRTYÁT</small><b className="block mt-1">Melyik jelentés tartozik hozzá?</b></div>
+      <div className="text-center mb-4"><small className="text-slate-400 text-xs">HÚZD A KÁRTYÁT A JÓ JELENTÉS FELÉ</small><b className="block mt-1">Melyik jelentés tartozik hozzá?</b></div>
       <div className="flex items-stretch gap-2">
-        <button onClick={() => commit('left')} className="flex-1 rounded-2xl bg-white/5 ring-1 ring-white/10 p-3 text-center"><small className="text-[10px] text-slate-500 block">BALRA</small><strong className="text-sm">{choices[0].v}</strong></button>
-        <motion.div drag="x" dragConstraints={{ left: 0, right: 0 }} onDragEnd={(e, info) => { if (info.offset.x < -70) commit('left'); else if (info.offset.x > 70) commit('right'); }}
-          className="w-32 shrink-0 rounded-2xl bg-gradient-to-br from-brand to-indigo-400 p-4 grid place-items-center text-center cursor-grab active:cursor-grabbing shadow-card">
-          <div><span className="text-[10px] text-white/70">EN</span><h3 className="font-heading font-extrabold text-xl mt-1">{target.term}</h3><span className="text-[11px] text-white/70">{target.partOfSpeech || 'word'}</span></div>
+        <div className="relative flex-1">
+          <button onClick={() => commit('left')} className="w-full h-full rounded-2xl bg-white/5 ring-1 ring-white/10 p-3 text-center grid place-items-center min-h-[92px]"><strong className="text-sm">{choices[0].v}</strong></button>
+          <motion.div style={{ opacity: leftGlow }} className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-brand bg-brand/15" />
+        </div>
+        <motion.div key={round} drag="x" style={{ x, rotate }} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.7} dragMomentum={false} onDragEnd={onDragEnd} whileTap={{ scale: 1.03 }}
+          className="relative w-32 shrink-0 rounded-2xl bg-gradient-to-br from-brand to-indigo-400 p-4 grid place-items-center text-center cursor-grab active:cursor-grabbing shadow-card touch-none select-none">
+          <div><span className="text-[10px] text-white/70">EN</span><h3 className="font-heading font-extrabold text-xl mt-1 leading-tight">{target.term}</h3><span className="text-[11px] text-white/70">{target.partOfSpeech || 'word'}</span></div>
+          <AnimatePresence>
+            {result && (
+              <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} className={`absolute inset-0 rounded-2xl grid place-items-center ${result === 'good' ? 'bg-emerald-500/85' : 'bg-rose-500/85'}`}>
+                {result === 'good' ? <Check size={44} strokeWidth={3} className="text-white" /> : <X size={44} strokeWidth={3} className="text-white" />}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
-        <button onClick={() => commit('right')} className="flex-1 rounded-2xl bg-white/5 ring-1 ring-white/10 p-3 text-center"><small className="text-[10px] text-slate-500 block">JOBBRA</small><strong className="text-sm">{choices[1].v}</strong></button>
+        <div className="relative flex-1">
+          <button onClick={() => commit('right')} className="w-full h-full rounded-2xl bg-white/5 ring-1 ring-white/10 p-3 text-center grid place-items-center min-h-[92px]"><strong className="text-sm">{choices[1].v}</strong></button>
+          <motion.div style={{ opacity: rightGlow }} className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-brand bg-brand/15" />
+        </div>
       </div>
-      <p className="text-center text-[11px] text-slate-500 mt-3">Húzd balra vagy jobbra · vagy koppints a jelentésre</p>
+      <p className="text-center text-[11px] text-slate-500 mt-3">Húzd gyorsan balra vagy jobbra · vagy koppints a jelentésre</p>
     </div>
   );
 }
