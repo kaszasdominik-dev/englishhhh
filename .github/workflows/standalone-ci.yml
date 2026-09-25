@@ -101,3 +101,124 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: yarn build
+
+
+  openai-api-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: englishhhh_openai_smoke
+      CORS_ORIGINS: http://localhost:3000
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Explain skipped live API test
+        if: env.OPENAI_API_KEY == ''
+        run: echo "OPENAI_API_KEY repository secret is not configured; real OpenAI smoke test skipped."
+
+      - uses: actions/setup-python@v5
+        if: env.OPENAI_API_KEY != ''
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend and WebRTC test client
+        if: env.OPENAI_API_KEY != ''
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install aiortc
+
+      - name: Start backend
+        if: env.OPENAI_API_KEY != ''
+        working-directory: backend
+        run: |
+          python -m uvicorn server:app --host 127.0.0.1 --port 8000 > /tmp/livo-openai.log 2>&1 &
+          echo $! > /tmp/livo-openai.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/livo-openai.log
+          exit 1
+
+      - name: Test Responses, TTS and GPT-Live session creation
+        if: env.OPENAI_API_KEY != ''
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio
+          import requests
+          from aiortc import RTCPeerConnection, RTCSessionDescription
+
+          BASE = "http://127.0.0.1:8000"
+
+          turn = requests.post(
+              BASE + "/api/turn-check",
+              json={
+                  "text": "Yesterday I did not met him.",
+                  "previousAssistant": "Tell me what happened yesterday.",
+                  "mode": "free",
+              },
+              timeout=60,
+          )
+          print("turn-check:", turn.status_code, turn.text[:500])
+          turn.raise_for_status()
+          assert isinstance(turn.json(), dict)
+
+          tts = requests.post(
+              BASE + "/api/voice-preview",
+              json={"teacher": "james", "text": "Hello. This is a LIVO API smoke test."},
+              timeout=60,
+          )
+          print("voice-preview:", tts.status_code, tts.headers.get("content-type"), len(tts.content))
+          tts.raise_for_status()
+          assert tts.content and len(tts.content) > 500
+
+          async def test_live():
+              pc = RTCPeerConnection()
+              pc.addTransceiver("audio", direction="sendrecv")
+              pc.createDataChannel("oai-events")
+
+              offer = await pc.createOffer()
+              await pc.setLocalDescription(offer)
+
+              response = requests.post(
+                  BASE + "/api/live-session",
+                  json={
+                      "sdp": pc.localDescription.sdp,
+                      "teacher": "james",
+                      "mode": "business",
+                      "durationMinutes": 5,
+                      "languageMode": "hu",
+                      "pace": "normal",
+                  },
+                  timeout=60,
+              )
+              print("live-session:", response.status_code, response.text[:800])
+              response.raise_for_status()
+              payload = response.json()
+              answer_sdp = (payload.get("transport") or {}).get("sdp")
+              assert isinstance(answer_sdp, str) and answer_sdp.strip(), payload
+              await pc.setRemoteDescription(RTCSessionDescription(sdp=answer_sdp, type="answer"))
+              await pc.close()
+
+          asyncio.run(test_live())
+          print("real OpenAI smoke OK")
+          PY
