@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only verification of the WORD TAP/LONG-PRESS → popover → save fix on both Desktop (1920x900) and Mobile (390x844). Drove UI via window.__livoEngine. All 5 requested feature areas PASS. On desktop, 6/6 sub-tests passed: short-tap opens word-popover, long-press (600ms hold) opens word-popover, popover-pronounce fires POST /api/pronounce with no JS errors, popover-save on uncommon word 'quarterly' toggles to '✓ Mentve', popover is visible above bottom controls (mic button starts at y=749, popover ends at y=748), transcript panel word-tap builds a selection and transcript-save-phrase bar appears. On mobile the identical flow works once the caption element is scrolled into view — initial mobile run failed only because the internal scroll container had the caption at y=-226 (off-screen); after scroll_into_view the exact same pointer-down / pointer-up (both short 60ms and long 600ms) triggered engine.lookupWord and popover.translation='mi' rendered correctly. The pointer-based tapHandlers() implementation correctly fires on BOTH short taps and long-press releases as designed. Popover z-30 clears the bottom controls on both viewports.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LiveRoom.jsx tapHandlers() uses (Math.abs(dx)+Math.abs(dy) < 16) as the movement threshold; on mobile devices with pointer coalescing this is fine, but consider also short-circuiting when e.pointerType==='mouse' && e.button!==0 to avoid right-click triggering a lookup.",
+    "The caption sits inside a flex-1 overflow-y-auto container; on short mobile viewports with connect diagnostics + orb visible, the caption can start below the fold and require scroll to reach — consider auto-scrolling to bring the active word into view when caption.activeIndex changes so users don't have to hunt for the current word to tap.",
+    "LiveRoom.jsx is now 526 lines; TranscriptPanel, TaskCard, WordPopover, SessionSetup and SummaryModal could each move to their own file for maintainability (repeat of iteration_1 comment)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "N/A - single demo-user app, no auth",
+  "seed_data_creation": "None - drove UI purely via window.__livoEngine as instructed; injected caption words and timeline turns for the transcript panel test",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Drive live-room via window.__livoEngine (WebRTC cannot be automated). CRITICAL for mobile testing: the caption lives inside a scrollable flex-1 container; call element.scroll_into_view_if_needed() before doing page.mouse.move/down/up on a caption-word, otherwise the pointer events land on the wrong element. Use page.mouse.down() + wait 500ms + page.mouse.up() to exercise the long-press path (tapHandlers fires on pointerup regardless of hold duration, as long as movement < 16px). /api/word-help takes 1-3s to return, so wait ~2.5-3s after tap before asserting popover translation. For save flow use an uncommon word (e.g. 'quarterly', 'stakeholder') because seeded common words show 'Már benne van'.",
+  "rca of the issue": "Original bug: caption word spans only had onClick — mobile long-press does NOT emit a click event on iOS/Android WebKit, so tapping/long-pressing did nothing. Fix (already applied by main agent): tapHandlers() attaches onPointerDown (records start position) + onPointerUp (fires onTap if pointer moved <16px). Verified: both short-tap and 600ms long-press-release trigger engine.lookupWord and the popover renders. Popover z-index raised to z-30 also verified: on desktop popover bottom=748 vs mic y=749 (clear), on mobile popover bottom=716 vs mic y=716.75 (clear)."
+}
