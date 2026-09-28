@@ -1,12 +1,25 @@
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useState, useSyncExternalStore, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
 import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb } from 'lucide-react';
+
+// Fire on ANY release (short tap OR long-press) as long as the finger didn't drag/scroll.
+// Mobile long-press does NOT emit a `click`, so we drive word lookups from pointer events instead.
+function tapHandlers(ref, onTap) {
+  return {
+    onPointerDown: (e) => { ref.current = { x: e.clientX, y: e.clientY }; },
+    onPointerUp: (e) => {
+      const st = ref.current; ref.current = null;
+      if (!st || (Math.abs(e.clientX - st.x) + Math.abs(e.clientY - st.y) < 16)) onTap();
+    },
+  };
+}
 
 export function LiveRoom({ engine }) {
   const s = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   const t = TEACHERS[s.teacher] || TEACHERS.james;
   const [showTranscript, setShowTranscript] = useState(false);
+  const tapRef = useRef(null);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
@@ -74,7 +87,7 @@ export function LiveRoom({ engine }) {
                 <p className="text-[22px] leading-relaxed font-heading font-semibold flex flex-wrap gap-x-1.5 gap-y-1">
                   {s.caption.words.map((w, i) => (
                     <span key={i} data-testid={i === 0 ? 'caption-word' : undefined}
-                      onClick={() => engine.lookupWord(w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, ''), s.caption.text)}
+                      {...tapHandlers(tapRef, () => engine.lookupWord(w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, ''), s.caption.text))}
                       className={`kw ${i < s.caption.activeIndex ? 'text-white' : i === s.caption.activeIndex ? 'text-brand-ring bg-white/10' : 'text-slate-500'}`}>{w}</span>
                   ))}
                 </p>
@@ -122,8 +135,8 @@ export function LiveRoom({ engine }) {
           {/* Word popover */}
           <AnimatePresence>
             {s.wordPopover && (
-              <motion.div data-testid="word-popover" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute left-4 right-4 bottom-32 z-20 rounded-2xl bg-white text-ink p-4 shadow-card">
-                <button onClick={() => engine.closeWordPopover()} className="absolute top-3 right-3 text-ink-faint"><X size={15} /></button>
+              <motion.div data-testid="word-popover" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute left-4 right-4 bottom-32 z-30 rounded-2xl bg-white text-ink p-4 shadow-card">
+                <button data-testid="popover-close" onClick={() => engine.closeWordPopover()} className="absolute top-3 right-3 text-ink-faint"><X size={15} /></button>
                 <div className="text-[10px] tracking-widest font-bold text-ink-mute">GYORS JELENTÉS</div>
                 <div className="flex items-center gap-2 mt-1"><b className="font-heading text-lg">{s.wordPopover.word}</b><ArrowRight size={14} className="text-ink-faint" /><strong className="text-brand">{s.wordPopover.loading ? 'Fordítás…' : (s.wordPopover.translation || '—')}</strong></div>
                 <p className="text-xs text-ink-mute mt-1">{s.wordPopover.error || s.wordPopover.contextMeaning || s.wordPopover.explanation || ''}</p>
@@ -433,6 +446,7 @@ const stripEdge = (w) => w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, '');
 
 function TranscriptPanel({ s, engine, teacher, onClose }) {
   const [sel, setSel] = useState({ turnId: null, idx: [] });
+  const tapRef = useRef(null);
   const turns = s.timeline.filter(x => normalizeSpeechText(x.text));
   const activeTurn = turns.find(x => x.id === sel.turnId);
   const activeWords = activeTurn ? normalizeSpeechText(activeTurn.text).split(/\s+/) : [];
@@ -482,7 +496,7 @@ function TranscriptPanel({ s, engine, teacher, onClose }) {
                     const active = sel.turnId === turn.id && sel.idx.includes(i);
                     return (
                       <span key={i} data-testid={isUser ? undefined : (turn.id === turns.find(x => x.role !== 'user')?.id && i === 0 ? 'transcript-word' : undefined)}
-                        onClick={() => toggle(turn, i)}
+                        {...tapHandlers(tapRef, () => toggle(turn, i))}
                         className={`kw ${active ? 'bg-brand text-white' : (isUser ? 'text-slate-100' : 'text-slate-200')}`}>{w}</span>
                     );
                   })}
