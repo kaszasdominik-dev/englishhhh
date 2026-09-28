@@ -562,16 +562,22 @@ export class LiveEngine {
   async taskDontKnow() {
     const pt = this.practiceTarget; if (!pt || pt.state === 'correct') return;
     let answer = pt.kind === 'translate' ? (pt.answer || pt.correctAnswer) : pt.text;
+    // Reveal immediately (optimistic) so there is no visible delay after the tap.
+    this.practiceTarget = { ...this.practiceTarget, state: 'dont_know', correctAnswer: answer || '', hintLevel: 0, reason: answer ? 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' : 'Egy pillanat, előkészítem a helyes választ…' };
+    this.notify();
     if (pt.kind === 'translate' && !answer) {
       try {
         const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction: 'hu_en', explicitLookup: true }) }).then(x => x.json());
         answer = normalizeSpeechText(r?.translation || '');
       } catch { /* fall through */ }
+      answer = answer || pt.text;
+      if (this.practiceTarget && this.practiceTarget.state === 'dont_know') {
+        this.practiceTarget = { ...this.practiceTarget, correctAnswer: answer, reason: 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' };
+        this.notify();
+      }
     }
     answer = answer || pt.text;
-    this.practiceTarget = { ...this.practiceTarget, state: 'dont_know', correctAnswer: answer, hintLevel: 0, reason: 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' };
     this.recordTaskSR(pt.kind === 'translate' ? answer : pt.text, 'dont_know');
-    this.notify();
     this.oneShot(`The learner pressed "Nem tudom" (I don't know) for this task. In natural Hungarian kindly reassure them, then pronounce the correct English answer ${JSON.stringify(answer)} clearly ONCE in native English, and ask them in Hungarian to repeat it after you. Keep it short.`);
   }
   async recordTaskSR(term, outcome) {
