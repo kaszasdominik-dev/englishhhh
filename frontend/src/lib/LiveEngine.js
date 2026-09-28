@@ -99,7 +99,8 @@ export class LiveEngine {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       this.stream = stream; this.startMicMonitor(stream);
       if (!isReconnect) { this.setDiag('mic', 'done'); this.setDiag('session', 'active'); }
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] }); this.pc = pc;
+      const iceServers = await this.getIceServers();
+      const pc = new RTCPeerConnection({ iceServers, iceCandidatePoolSize: 4 }); this.pc = pc;
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
       pc.ontrack = (e) => {
         const a = this.audioEl();
@@ -204,6 +205,16 @@ export class LiveEngine {
   }
 
   audioEl() { return document.getElementById('livo-remote-audio'); }
+  // ICE servers (STUN + optional TURN relay for restrictive networks) fetched from the backend once.
+  async getIceServers() {
+    if (this._iceServers) return this._iceServers;
+    const fallback = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+    try {
+      const cfg = await fetch(`${API}/rtc-config`).then(r => r.json());
+      this._iceServers = (cfg && Array.isArray(cfg.iceServers) && cfg.iceServers.length) ? cfg.iceServers : fallback;
+    } catch { this._iceServers = fallback; }
+    return this._iceServers;
+  }
   // On-screen connection diagnostics so the learner can see exactly which step stalls.
   setDiag(key, state, detail = '') {
     const labels = { mic: 'Mikrofon engedélyezése', session: 'Munkamenet létrehozása', webrtc: 'Hangkapcsolat felépítése', live: 'Élő kapcsolat' };

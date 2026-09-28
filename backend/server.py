@@ -943,6 +943,35 @@ Return:
         logger.error("task-eval %s", e)
         return {"state": "almost_correct", "correctAnswer": expected, "reason": "Az ellen\u0151rz\u00e9s most nem \u00e9rt\u00e9kelte pontosan \u2014 a tan\u00e1r hangban ellen\u0151rzi."}
 
+STUN_URLS = ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478']
+
+@api.get("/rtc-config")
+async def rtc_config():
+    """ICE servers for the live WebRTC session. Adds a TURN relay (for firewall/NAT traversal)
+    when TURN credentials are configured; otherwise falls back to STUN-only."""
+    ice = [{"urls": STUN_URLS}]
+    api_key = os.environ.get('METERED_TURN_API_KEY', '')
+    domain = os.environ.get('METERED_TURN_DOMAIN', '')
+    if api_key and domain:
+        try:
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f'https://{domain}/api/v1/turn/credentials', params={'apiKey': api_key})
+            if r.status_code < 400:
+                servers = r.json()
+                if isinstance(servers, list) and servers:
+                    return {"iceServers": servers, "turn": True}
+        except Exception as e:
+            logger.error("metered turn fetch %s", e)
+    turn_urls = os.environ.get('TURN_URLS', '')
+    if turn_urls:
+        entry = {"urls": [u.strip() for u in turn_urls.split(',') if u.strip()]}
+        if os.environ.get('TURN_USERNAME'):
+            entry['username'] = os.environ['TURN_USERNAME']
+        if os.environ.get('TURN_CREDENTIAL'):
+            entry['credential'] = os.environ['TURN_CREDENTIAL']
+        return {"iceServers": [{"urls": STUN_URLS}, entry], "turn": True}
+    return {"iceServers": ice, "turn": False}
+
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True,
                    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
