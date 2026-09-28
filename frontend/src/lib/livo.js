@@ -77,28 +77,57 @@ export function stripTaskTail(text = '') {
   t = t.replace(/[,;]?\s*(csak\s+egy\s+rövid\s+verzióban|röviden|egyszerűen|természetesen(?:ebben)?|most csak (?:ezt|ennyit)|egy\s+mondatban|ha\s+tudod|lassan|utánam)\b.*$/i, '');
   return t.replace(/[.!?,:;]+$/, '').trim();
 }
+export function looksEnglishWord(w = '') {
+  const s = String(w).toLowerCase().trim();
+  if (!/^[a-z][a-z'’-]{1,}$/.test(s)) return false;
+  if (/[wxq]/.test(s)) return true;
+  if (/(tion|sion|ment|able|ible|ance|ence|ing|ness|ship|ery|ory|ary|ity|ous|ive|ough|eous|ial|ier|ple|ply|dline| line|voice|plier)$/.test(s)) return true;
+  if (/(th|wh|ck|ght|ph|sch)/.test(s)) return true;
+  return false;
+}
 export function extractPracticeInstruction(text = '') {
   const clean = normalizeSpeechText(text); if (!clean) return null;
-  const translateCue = /(mondd(?:jad)?(?:\s+(?:ki|ezt|el|nekem|most)){0,3}\s+angolul|hogy(?:an)?\s+mond(?:od|anád|anad|juk)(?:\s+ezt)?\s+angolul|mi\s+az\s+angolul|hogy\s+van(?:\s+ez)?\s+angolul|fordítsd(?:\s+le)?(?:\s+ezt)?\s+angolra|forditsd(?:\s+le)?(?:\s+ezt)?\s+angolra|angolra\s+fordítsd|angolra\s+forditsd)/i;
   const quotedAll = [...clean.matchAll(/["“„]([^"”]{1,180})["”]/g)].map(m => m[1].trim());
-  if (translateCue.test(clean)) {
-    const quotedHu = quotedAll.filter(isTranslateTarget);
-    if (quotedHu.length) return { text: stripTaskTail(quotedHu[quotedHu.length - 1]), kind: 'translate' };
-    const m = clean.match(translateCue);
-    const after = stripTaskTail(clean.slice(m.index + m[0].length).replace(/^[\s:–—,.!?-]+/, '').split(/[.!?]/)[0]);
-    if (isTranslateTarget(after)) return { text: after, kind: 'translate' };
+  const oneWordEn = (t) => /^[a-z][a-z'’-]{1,}$/i.test(t) && !/[áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(t);
+
+  // 1) Explicit "in English" cue: fordítsd/mondd ... angolul / angolra.
+  const angolulCue = /\bangolul\b/i.test(clean) && /(mondd|mondjad|fordítsd|forditsd|hogy(?:an)?\s+(?:van|mond)|mi\s+az|ismételd|ismeteld|próbáld|probald|ejtsd|ejtsed)/i.test(clean);
+  const angolraCue = /\bangolra\b/i.test(clean) && /(fordítsd|forditsd|mondd|mondjad|váltsd|valtsd|hogy)/i.test(clean);
+  if (angolulCue || angolraCue) {
+    let target = '';
+    if (quotedAll.length) target = quotedAll[quotedAll.length - 1];
+    else {
+      const colon = clean.lastIndexOf(':');
+      if (colon >= 0) target = clean.slice(colon + 1);
+      else { const m = clean.match(/\b(angolul|angolra)\b/i); target = m ? clean.slice(m.index + m[0].length) : ''; }
+    }
+    target = stripTaskTail(target.replace(/^[\s:–—,.!?-]+/, '').split(/[.!?]/)[0]);
+    if (target) {
+      // Target already English (e.g. "deliverable", "compliance") → pronounce/repeat.
+      if ((oneWordEn(target) && looksEnglishWord(target)) || likelyEnglishPracticePhrase(target)) return { text: target, kind: 'repeat' };
+      // Hungarian source → translate into English.
+      if (isTranslateTarget(target)) return { text: target, kind: 'translate' };
+    }
   }
-  const cue = /(mondd|mondjad|ismételd|ismeteld|próbáld|probal|say|repeat|try saying)/i;
+
+  // 2) Repeat / pronounce cue.
+  const cue = /(mondd|mondjad|ismételd|ismeteld|próbáld|probal|say|repeat|try saying|ejtsd|ejtsed)/i;
   if (!cue.test(clean)) return null;
   const quotedEn = quotedAll.filter(likelyEnglishPracticePhrase);
   if (quotedEn.length) return { text: stripTaskTail(quotedEn[quotedEn.length - 1]), kind: 'repeat' };
-  // single English word in quotes (e.g. Ismételd utánam: "compliance")
   const quotedWord = quotedAll.map(q => q.trim()).reverse().find(q => /^[a-z][a-z'’-]{2,}$/i.test(q) && !/[áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(q));
   if (quotedWord) return { text: stripTaskTail(quotedWord), kind: 'repeat' };
-  const afterRaw = (clean.match(/(?:mondd|mondjad|ismételd|ismeteld|próbáld|probal(?:d)?|say|repeat|try saying)(?:\s+(?:ki|ezt|utánam|utanam|meg|így|igy|egyben|this|it|after me)){0,4}\s*[:–—-]\s*(.{2,180})$/i) || [])[1] || '';
+  // text after the last colon
+  const colon = clean.lastIndexOf(':');
+  if (colon >= 0) {
+    const after = stripTaskTail(clean.slice(colon + 1).replace(/^[\s–—-]+/, '').split(/[.!?]/)[0]);
+    if (likelyEnglishPracticePhrase(after)) return { text: after, kind: 'repeat' };
+    if (after && oneWordEn(after)) return { text: after, kind: 'repeat' };
+  }
+  const afterRaw = (clean.match(/(?:mondd|mondjad|ismételd|ismeteld|próbáld|probal(?:d)?|say|repeat|try saying|ejtsd|ejtsed)(?:\s+\S+){0,6}?\s*[:–—-]\s*(.{2,180})$/i) || [])[1] || '';
   const after = stripTaskTail(afterRaw);
   if (likelyEnglishPracticePhrase(after)) return { text: after, kind: 'repeat' };
-  if (after && /^[a-z][a-z'’-]{2,}$/i.test(after) && !/[áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(after)) return { text: after, kind: 'repeat' };
+  if (after && oneWordEn(after)) return { text: after, kind: 'repeat' };
   const parts = clean.split(/(?<=[.!?])\s+/).map(x => x.trim()).filter(Boolean);
   const candidates = parts.filter(x => !cue.test(x) && likelyEnglishPracticePhrase(x));
   if (candidates.length) return { text: stripTaskTail(candidates[candidates.length - 1].replace(/^[–—:-]\s*/, '')), kind: 'repeat' };
