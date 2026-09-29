@@ -317,11 +317,11 @@ function WordPracticeSetup({ data, onStart }) {
   };
 
   const modes = [
-    ['mixed', 'Vegyes', 'Kiejtés + helyesírás + hangzás'],
-    ['pronounce', 'Kiejtés', 'Hallgasd, ismételd, lassítsd vagy szótagold'],
-    ['dictation', 'Hallás utáni írás', 'Csak hallod a szót, neked kell leírni'],
-    ['missing', 'Hiányzó betűk', 'Egészítsd ki a hallott szót'],
-    ['sound', 'Hangcsapdák', 'ship/sheep · th · w/v · a/e'],
+    ['mixed', 'Vegyes', 'Kiejtés + helyesírás + hangzás', true],
+    ['pronounce', 'Kiejtés', 'Hallgasd, ismételd, lassítsd vagy szótagold', false],
+    ['dictation', 'Hallás utáni írás', 'Csak hallod a szót, neked kell leírni', false],
+    ['missing', 'Hiányzó betűk', 'Egészítsd ki a hallott szót', false],
+    ['sound', 'Hangcsapdák', 'ship/sheep · th · w/v · a/e', false],
   ];
 
   return (
@@ -353,9 +353,15 @@ function WordPracticeSetup({ data, onStart }) {
       <section>
         <div className="text-xs font-semibold text-ink-mute mb-2">Hogyan gyakorolj?</div>
         <div className="space-y-2">
-          {modes.map(([id, title, sub]) => (
+          {modes.map(([id, title, sub, recommended]) => (
             <button key={id} onClick={() => setMode(id)} className={`w-full rounded-2xl p-3.5 text-left ring-1 transition-all ${mode === id ? 'bg-brand-soft ring-brand/30' : 'bg-white ring-slate-100'}`}>
-              <div className="flex items-center justify-between"><b className="text-sm text-ink">{title}</b>{mode === id && <Check size={15} className="text-brand" />}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <b className="text-sm text-ink">{title}</b>
+                  {recommended && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-600">🔥 AJÁNLOTT</span>}
+                </div>
+                {mode === id && <Check size={15} className="text-brand shrink-0" />}
+              </div>
               <p className="text-xs text-ink-mute mt-0.5">{sub}</p>
             </button>
           ))}
