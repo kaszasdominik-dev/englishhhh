@@ -47,6 +47,12 @@ const SOUND_PAIRS = [
 
 const norm = (v) => normalizeSpeechText(v || '').toLowerCase();
 
+function stopAudioPlayback(audioRef) {
+  const audio = audioRef?.current;
+  try { audio?.pause(); } catch {}
+  try { window.speechSynthesis?.cancel(); } catch {}
+}
+
 function roughSyllableText(value = '') {
   return String(value).split(/\s+/).map(word => {
     const clean = word.replace(/[^a-z'-]/gi, '');
@@ -145,7 +151,7 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
 
   const speak = async (delivery = 'normal') => {
     if (!target?.term) return;
-    try { audioRef.current?.pause(); } catch {}
+    stopAudioPlayback(audioRef);
     setPlaying(true);
 
     // Strict zero-token path: Word Practice NEVER calls OpenAI/TTS.
@@ -157,14 +163,14 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   };
 
   useEffect(() => {
-    try { audioRef.current?.pause(); } catch {}
+    stopAudioPlayback(audioRef);
     setPlaying(false);
     setAnswer('');
     setLocked(false);
     setFeedback(null);
     if (!target) { setDone(true); return; }
     const id = ['meaning', 'translation'].includes(mode) ? null : setTimeout(() => speak('normal'), 220);
-    return () => { if (id) clearTimeout(id); try { audioRef.current?.pause(); } catch {} try { window.speechSynthesis?.cancel(); } catch {} };
+    return () => { if (id) clearTimeout(id); stopAudioPlayback(audioRef); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round, mode]);
 
