@@ -145,7 +145,12 @@ async def recommend_dictionary_words(db, topic='', level='B1', count=10, exclude
         cur = db.dictionary.find(match).sort([('frequency', -1), ('quality', -1)]).limit(limit)
         return [x async for x in cur]
 
-    base = {'practiceEligible': True}
+    # Raw FreeDict contains many historical/idiomatic multi-word entries whose
+    # literal English surface form is misleading for a modern learner
+    # (e.g. "to cross the river" as an old euphemism for dying).
+    # Keep them searchable in the catalog, but never surface them in automatic
+    # recommendation packs. Curated phrase packs can be added separately later.
+    base = {'practiceEligible': True, 'partOfSpeech': {'$ne': 'phrase'}}
     if excluded:
         base['termLower'] = {'$nin': excluded}
 
