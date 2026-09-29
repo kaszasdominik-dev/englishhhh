@@ -180,8 +180,19 @@ async def recommend_dictionary_words(db, topic='', level='B1', count=10, exclude
 
     if len(pool) < count:
         fallback = dict(base)
-        idx = LEVEL_ORDER.index(level)
-        fallback['level'] = {'$in': LEVEL_ORDER[max(0, idx-1):min(6, idx+2)]}
+        if canonical_topic in TOPIC_KEYWORDS:
+            # Keep topic fidelity; only relax the learner level.
+            fallback['topics'] = canonical_topic
+        elif canonical_topic:
+            # Free-text lookup stays a lookup; never silently become Random.
+            safe = re.escape(canonical_topic[:60])
+            fallback['$or'] = [
+                {'termLower': {'$regex': safe, '$options': 'i'}},
+                {'meanings': {'$regex': safe, '$options': 'i'}},
+            ]
+        else:
+            idx = LEVEL_ORDER.index(level)
+            fallback['level'] = {'$in': LEVEL_ORDER[max(0, idx-1):min(6, idx+2)]}
         for x in await fetch(fallback, 1200):
             k = x.get('termLower')
             if k and k not in seen:
