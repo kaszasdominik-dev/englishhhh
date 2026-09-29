@@ -240,6 +240,55 @@ def select_quiz_words(vocab, limit=12):
     ordered = due + weak + new + stable[:max(1, limit // 4)]
     return ordered[:limit]
 
+
+SKILL_NAMES = ('meaning', 'translation', 'spelling', 'pronunciation')
+
+def ensure_skill_progress(word):
+    skills = word.setdefault('skillMastery', {})
+    stats = word.setdefault('skillStats', {})
+    base = int(word.get('mastery', 40) or 40)
+    for skill in SKILL_NAMES:
+        skills.setdefault(skill, base)
+        stats.setdefault(skill, {'attempts': 0, 'correct': 0, 'wrong': 0, 'dontKnow': 0, 'lastPracticedAt': None})
+    return word
+
+def apply_skill_result(word, skill, outcome):
+    if skill not in SKILL_NAMES:
+        return word
+    ensure_skill_progress(word)
+    current = int(word['skillMastery'].get(skill, 40))
+    delta = {'correct': 9, 'almost_correct': 3, 'wrong': -8, 'dont_know': -12}.get(outcome, -8)
+    word['skillMastery'][skill] = clamp(current + delta, 0, 100)
+    st = word['skillStats'][skill]
+    st['attempts'] = int(st.get('attempts', 0)) + 1
+    if outcome == 'correct':
+        st['correct'] = int(st.get('correct', 0)) + 1
+    elif outcome == 'dont_know':
+        st['dontKnow'] = int(st.get('dontKnow', 0)) + 1
+        st['wrong'] = int(st.get('wrong', 0)) + 1
+    elif outcome in ('wrong', 'almost_correct'):
+        st['wrong'] = int(st.get('wrong', 0)) + 1
+    st['lastPracticedAt'] = now_iso()
+    vals = [int(word['skillMastery'].get(k, 40)) for k in SKILL_NAMES]
+    word['skillAverage'] = round(sum(vals) / len(vals))
+    word['weakestSkill'] = min(SKILL_NAMES, key=lambda k: int(word['skillMastery'].get(k, 40)))
+    return word
+
+def dictionary_progress_entry(state, dictionary_id, term=''):
+    progress = state.setdefault('dictionaryProgress', {})
+    item = progress.setdefault(dictionary_id, {
+        'dictionaryId': dictionary_id,
+        'term': term,
+        'mastery': 40,
+        'attempts': 0,
+        'lastPracticedAt': None,
+        'nextReview': None,
+    })
+    if term:
+        item['term'] = term
+    ensure_skill_progress(item)
+    return item
+
 # ------------------------------------------------------------------ tutor prompt
 def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace):
     t = teachers.get(teacher, teachers['maya'])
@@ -510,22 +559,54 @@ async def local_dictionary_pack(body):
     count = clamp(int(body.get('count') or 10), 5, 30)
     state = await load_state()
     existing = [clean_word_field(v.get('term')).lower() for v in state.get('vocabulary', []) if clean_word_field(v.get('term'))][:500]
-    words = await recommend_dictionary_words(db, requested, level, count, existing)
+
+    # Ask for a wider local candidate pool, then rank it using only user progress.
+    candidate_count = min(30, max(count, count * 3))
+    words = await recommend_dictionary_words(db, requested, level, candidate_count, existing)
+    progress = state.get('dictionaryProgress', {}) or {}
+    now = datetime.now(timezone.utc)
+
+    def progress_score(w):
+        p = progress.get(w.get('dictionaryId')) or {}
+        ensure_skill_progress(p)
+        avg = int(p.get('skillAverage', 40))
+        attempts = int(p.get('attempts', 0))
+        due_bonus = 0
+        try:
+            due = p.get('nextReview')
+            if due and datetime.fromisoformat(str(due).replace('Z', '+00:00')) <= now:
+                due_bonus = 18
+        except Exception:
+            pass
+        # New words still surface, but weak/due words get priority when seen before.
+        return (due_bonus + (100 - avg) + (8 if attempts == 0 else 0) + random.random() * 8)
+
+    words.sort(key=progress_score, reverse=True)
+    words = words[:count]
+    for w in words:
+        p = progress.get(w.get('dictionaryId')) or {}
+        if p:
+            ensure_skill_progress(p)
+            w['skillMastery'] = p.get('skillMastery', {})
+            w['skillAverage'] = p.get('skillAverage', 40)
+            w['weakestSkill'] = p.get('weakestSkill')
+
     if len(words) < min(4, count):
         total = await db.dictionary.count_documents({'practiceEligible': True})
         code = 'DICTIONARY_NOT_READY' if total == 0 else 'TOO_FEW_DICTIONARY_WORDS'
         message = ('A helyi szótár még nincs betöltve. Futtasd: python scripts/import_freedict_dictionary.py'
                    if total == 0 else 'Ehhez a témához/szinthez most nincs elég helyi szó. Próbálj másik témát vagy Randomot.')
         return JSONResponse({'error': message, 'code': code}, status_code=503 if total == 0 else 422)
-    return {'topic': requested, 'level': level, 'words': words[:count], 'excludedExisting': len(existing),
+    return {'topic': requested, 'level': level, 'words': words, 'excludedExisting': len(existing),
             'source': 'local_dictionary', 'llmTokens': 0}
 
 @api.get("/dictionary/status")
 async def dictionary_status():
     total = await db.dictionary.count_documents({})
     eligible = await db.dictionary.count_documents({'practiceEligible': True})
-    return {'ready': eligible > 0, 'total': total, 'practiceEligible': eligible,
-            'source': 'FreeDict eng-hun', 'runtimeLlmTokens': 0}
+    enriched = await db.dictionary.count_documents({'oewnEnriched': True})
+    return {'ready': eligible > 0, 'total': total, 'practiceEligible': eligible, 'oewnEnriched': enriched,
+            'source': 'FreeDict eng-hun + Open English WordNet', 'runtimeLlmTokens': 0}
 
 @api.post("/dictionary/recommend")
 async def dictionary_recommend(request: Request):
@@ -613,23 +694,52 @@ async def game_photo(query: str = '', word: str = '', target: str = '', terms: s
 async def game_result(request: Request):
     body = await request.json()
     term = clean_word_field(body.get('term'))
+    dictionary_id = clean_word_field(body.get('dictionaryId'))
     correct = body.get('correct') is True
     outcome = body.get('outcome')
     if outcome not in ('correct', 'almost_correct', 'wrong', 'dont_know'):
         outcome = 'correct' if correct else 'wrong'
     game = clean_word_field(body.get('game', 'game'))
+    skill = clean_word_field(body.get('skill')).lower()
+    if skill not in SKILL_NAMES:
+        skill = {
+            'word_practice_meaning': 'meaning',
+            'word_practice_translation': 'translation',
+            'word_practice_dictation': 'spelling',
+            'word_practice_missing': 'spelling',
+            'word_practice_sound': 'pronunciation',
+            'word_practice_pronounce': 'pronunciation',
+        }.get(game)
     if not term:
-        return JSONResponse({"error": "Hi\u00e1nyzik a sz\u00f3."}, status_code=400)
+        return JSONResponse({"error": "Hiányzik a szó."}, status_code=400)
+
     state = await load_state()
     vocab = state.get('vocabulary', [])
     word = next((v for v in vocab if str(v.get('term', '')).lower() == term.lower()), None)
-    if not word:
-        return JSONResponse({"error": "A sz\u00f3 nincs a sz\u00f3bankban."}, status_code=404)
-    apply_sr(word, outcome)
-    word['lastGame'] = game
-    word['lastPracticedAt'] = now_iso()
+
+    if word:
+        apply_sr(word, outcome)
+        apply_skill_result(word, skill, outcome)
+        word['lastGame'] = game
+        word['lastPracticedAt'] = now_iso()
+
+    if dictionary_id:
+        dp = dictionary_progress_entry(state, dictionary_id, term)
+        dp['attempts'] = int(dp.get('attempts', 0)) + 1
+        dp['lastPracticedAt'] = now_iso()
+        apply_skill_result(dp, skill, outcome)
+        if outcome == 'correct':
+            days = 1 if dp['skillAverage'] < 60 else 3 if dp['skillAverage'] < 80 else 7
+        else:
+            days = 1
+        dp['nextReview'] = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+
+    if not word and not dictionary_id:
+        return JSONResponse({"error": "A szó nincs a szóbankban és nincs szótári azonosítója."}, status_code=404)
+
     await save_state(state)
-    return {"ok": True, "word": word, "state": public_state(state)}
+    return {"ok": True, "word": word, "dictionaryProgress": state.get('dictionaryProgress', {}).get(dictionary_id) if dictionary_id else None,
+            "state": public_state(state)}
 
 async def validate_vocab(term, meaning, example):
     schema = {"type": "object", "additionalProperties": False, "properties": {
@@ -712,6 +822,16 @@ async def upsert_vocabulary(request: Request):
                 "source": clean_word_field(body.get('source')) or 'manual', "sourceLanguage": "en"}
         vocab.insert(0, word)
     ensure_sr(word)
+    ensure_skill_progress(word)
+    if dictionary_id:
+        dp = state.get('dictionaryProgress', {}).get(dictionary_id)
+        if dp:
+            ensure_skill_progress(dp)
+            word['dictionaryId'] = dictionary_id
+            word['skillMastery'] = dict(dp.get('skillMastery', word.get('skillMastery', {})))
+            word['skillStats'] = dict(dp.get('skillStats', word.get('skillStats', {})))
+            word['skillAverage'] = dp.get('skillAverage', word.get('skillAverage', 40))
+            word['weakestSkill'] = dp.get('weakestSkill', word.get('weakestSkill'))
     await save_state(state)
     return {"ok": True, "word": word, "state": public_state(state), "canonicalized": checked.get('canonicalized') is True}
 
