@@ -136,7 +136,7 @@ export function LiveRoom({ engine }) {
                 <div className="text-[10px] tracking-widest font-bold text-ink-mute">JELENTÉS</div>
                 <div className="flex items-center gap-2 mt-1"><b className="font-heading text-lg">{s.wordPopover.word}</b><ArrowRight size={14} className="text-ink-faint" /><strong className="text-brand">{s.wordPopover.loading ? 'Fordítás…' : (s.wordPopover.translation || '—')}</strong></div>
                 <p className="text-xs text-ink-mute mt-1">{s.wordPopover.error || s.wordPopover.contextMeaning || s.wordPopover.explanation || ''}</p>
-                {!s.wordPopover.error && (
+                {!!s.wordPopover.translation && (
                   <div className="mt-3 flex items-center gap-2">
                     <button data-testid="popover-pronounce" disabled={s.wordPopover.loading} onClick={() => engine.pronounceText(s.wordPopover.sourceLanguage === 'hu' ? s.wordPopover.translation : s.wordPopover.word)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-100 text-ink text-sm font-semibold py-2.5 px-4 disabled:opacity-50">
                       <Volume2 size={15} /> Kiejtés
