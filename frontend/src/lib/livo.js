@@ -101,8 +101,10 @@ export function extractPracticeInstruction(text = '') {
       .split(/[!?]/)[0]
   );
   const targetAfterColon = () => {
-    const colon = Math.max(clean.lastIndexOf(':'), clean.lastIndexOf('–'), clean.lastIndexOf('—'));
-    return colon >= 0 ? cleanTarget(clean.slice(colon + 1)) : '';
+    const colon = clean.lastIndexOf(':');
+    if (colon >= 0) return cleanTarget(clean.slice(colon + 1));
+    const dash = Math.max(clean.lastIndexOf('–'), clean.lastIndexOf('—'));
+    return dash >= 0 ? cleanTarget(clean.slice(dash + 1)) : '';
   };
   const quotedTarget = () => quotedAll.length ? cleanTarget(quotedAll[quotedAll.length - 1]) : '';
 
