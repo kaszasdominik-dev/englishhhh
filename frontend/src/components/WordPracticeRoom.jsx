@@ -9,7 +9,7 @@ const ROUND_ORDER = ['pronounce', 'dictation', 'missing', 'sound'];
 
 const SOUND_PAIRS = [
   ['ship', 'sheep'], ['live', 'leave'], ['sit', 'seat'], ['fill', 'feel'], ['bit', 'beat'],
-  ['there', 'their'], ['than', 'then'], ['think', 'sink'], ['three', 'tree'], ['west', 'vest'],
+  ['than', 'then'], ['think', 'sink'], ['three', 'tree'], ['thought', 'taught'], ['west', 'vest'],
   ['wine', 'vine'], ['very', 'wary'], ['bat', 'bet'], ['man', 'men'], ['bad', 'bed'],
 ];
 
