@@ -330,6 +330,7 @@ function WordPracticeSetup({ data, onStart }) {
         <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">KÜLÖN A LIVE BESZÉLGETÉSTŐL</span>
         <h3 className="font-heading font-bold text-xl mt-1">Precíz szógyakorló</h3>
         <p className="text-sm text-slate-300 mt-1">A rendszer tudja, mi a feladat. Nincs töltelékduma és nincs transcriptből kitalált UI.</p>
+        <div className="mt-3 inline-flex rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-300">0 AI TOKEN · ESZKÖZHANG</div>
       </section>
 
       <section>
@@ -338,7 +339,7 @@ function WordPracticeSetup({ data, onStart }) {
           {[
             ['saved', 'Szavaim', `${saved.length} szó`],
             ['hard', 'Nehéz', `${hard.length} szó`],
-            ['recommended', 'Ajánlott', 'AI válogatás'],
+            ['recommended', 'Ajánlott', 'Helyi válogatás · 0 token'],
           ].map(([id, title, sub]) => (
             <button key={id} onClick={() => setSource(id)} className={`rounded-2xl p-3 text-left ring-1 transition-all ${source === id ? 'bg-brand text-white ring-brand' : 'bg-white text-ink ring-slate-100'}`}>
               <b className="text-sm block">{title}</b><span className={`text-[10px] ${source === id ? 'text-white/70' : 'text-ink-faint'}`}>{sub}</span>
@@ -394,18 +395,18 @@ function WordLab({ data, onPlay }) {
   const [custom, setCustom] = useState('');
   const [count, setCount] = useState(10);
   const [busy, setBusy] = useState(false);
-  const games = [['swipe', 'Swipe Match', 'Húzd a jó jelentés felé'], ['image', 'Kép → szó', 'Találd ki a kép szavát'], ['quick', 'Gyors kör', 'Feleletválasztós'], ['match', 'Párosító', 'Kösd össze a párokat'], ['memory', 'Memory', 'Memóriajáték']];
+  const [dictStatus, setDictStatus] = useState(null);
+  useEffect(() => { api('/dictionary/status').then(setDictStatus).catch(() => {}); }, []);
+  const games = [['swipe', 'Swipe Match', 'Húzd a jó jelentés felé'], ['quick', 'Gyors kör', 'Feleletválasztós'], ['match', 'Párosító', 'Kösd össze a párokat'], ['memory', 'Memory', 'Memóriajáték']];
   const label = normalizeSpeechText(custom || topic) || 'Random';
   const launch = async (id) => {
     if (busy) return;
     const chosen = normalizeSpeechText(custom || topic).slice(0, 80);
     setBusy(id);
     try {
-      const need = id === 'image' ? Math.max(count, 12) : count;
-      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data.profile?.cefr || 'B1', count: need, forImages: id === 'image' }) });
-      let words = Array.isArray(r.words) ? r.words : [];
-      if (id === 'image') words = words.filter(w => w.imageable);
-      if (words.length < 4) throw new Error(id === 'image' ? 'Ehhez a témához most nem találtam elég képes szót. Válassz tárgyiasabb témát (pl. konyha, sport, utazás, állatok).' : 'Túl kevés új szó ehhez a témához. Próbálj mást vagy Randomot.');
+      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data.profile?.cefr || 'B1', count }) });
+      const words = Array.isArray(r.words) ? r.words : [];
+      if (words.length < 4) throw new Error('Túl kevés helyi szó ehhez a témához. Próbálj másik témát vagy Randomot.');
       onPlay(words, chosen || 'Random', id);
     } catch (e) { toast.error(e.message || 'Nem sikerült szócsomagot készíteni.'); }
     finally { setBusy(false); }
@@ -413,9 +414,13 @@ function WordLab({ data, onPlay }) {
   return (
     <div className="space-y-4">
       <div className="rounded-[1.35rem] bg-task-bg text-task-text p-5 shadow-card">
-        <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">WORD LAB · ÚJ SZAVAK</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">WORD LAB · HELYI SZÓTÁR</span>
+          <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[9px] font-extrabold text-emerald-300">0 AI TOKEN</span>
+          {dictStatus?.ready && <span className="text-[9px] font-bold text-slate-400">{Number(dictStatus.practiceEligible || 0).toLocaleString('hu-HU')} gyakorló szó</span>}
+        </div>
         <h3 className="font-heading font-bold text-lg mt-1 leading-tight">Válassz témát, majd indíts egy játékot.</h3>
-        <p className="text-sm text-slate-300 mt-1">A szavakat élőben állítom össze a témádhoz — és nem lövöm le előre, mit fogsz kapni. 😉</p>
+        <p className="text-sm text-slate-300 mt-1">A csomagot a helyi angol–magyar szótár és a saját szinted alapján válogatjuk. Gyors, kiszámítható, tokenmentes.</p>
       </div>
 
       <div>
@@ -425,7 +430,7 @@ function WordLab({ data, onPlay }) {
             <button key={tp || 'random'} onClick={() => { setTopic(tp); setCustom(''); }} className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${topic === tp && !custom ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{tp || '✦ Random'}</button>
           ))}
         </div>
-        <input data-testid="wordlab-topic" value={custom} onChange={e => { setCustom(e.target.value); setTopic(''); }} placeholder="…vagy írd be a saját témád (pl. ingatlan, főzés)" className="mt-2 w-full rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
+        <input data-testid="wordlab-topic" value={custom} onChange={e => { setCustom(e.target.value); setTopic(''); }} placeholder="…vagy pontos kulcsszó (pl. invoice, ingatlan)" className="mt-2 w-full rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
       </div>
 
       <div>
@@ -452,7 +457,7 @@ function WordLab({ data, onPlay }) {
             );
           })}
         </div>
-        <p className="text-[11px] text-ink-faint mt-2 text-center">A „Kép → szó" tárgyiasabb témákkal működik a legjobban.</p>
+        <p className="text-[11px] text-ink-faint mt-2 text-center">FreeDict-alapú helyi katalógus · a szint gyakorisági becslés, nem hivatalos CEFR-besorolás.</p>
       </div>
     </div>
   );

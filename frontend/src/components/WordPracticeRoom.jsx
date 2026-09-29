@@ -15,6 +15,36 @@ const SOUND_PAIRS = [
 
 const norm = (v) => normalizeSpeechText(v || '').toLowerCase();
 
+function roughSyllableText(value = '') {
+  return String(value).split(/\s+/).map(word => {
+    const clean = word.replace(/[^a-z'-]/gi, '');
+    if (!clean) return word;
+    const parts = clean.match(/[^aeiouy]*[aeiouy]+(?:[^aeiouy](?![aeiouy])|$)*/gi);
+    return parts && parts.length > 1 ? parts.join(' ... ') : clean;
+  }).join('   ');
+}
+
+function speakWithDeviceVoice(text, delivery, teacher, onDone) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const lang = ['maya', 'james'].includes(teacher) ? 'en-GB' : 'en-US';
+  const spoken = delivery === 'syllables' ? roughSyllableText(text) : text;
+  const u = new SpeechSynthesisUtterance(spoken);
+  u.lang = lang;
+  u.rate = delivery === 'slow' ? 0.62 : delivery === 'syllables' ? 0.48 : 0.92;
+  u.pitch = 1;
+  const voices = synth.getVoices();
+  u.voice = voices.find(v => v.lang === lang && /Microsoft|Google/i.test(v.name))
+    || voices.find(v => v.lang === lang)
+    || voices.find(v => v.lang?.startsWith(lang.slice(0, 2)))
+    || null;
+  u.onend = onDone;
+  u.onerror = onDone;
+  synth.speak(u);
+  return true;
+}
+
 function maskWord(term = '') {
   const chars = [...term];
   const letters = chars.map((c, i) => /[a-z]/i.test(c) ? i : -1).filter(i => i >= 0);
@@ -31,7 +61,7 @@ function soundOptions(term, pool) {
 
   const transforms = [
     [/(^|[^s])th/i, '$1t'], [/^w/i, 'v'], [/^v/i, 'w'],
-    [/ee/i, 'i'], [/i/i, 'ee'], [/a/i, 'e'], [/e/i, 'a'],
+    [/ee/i, 'i'], [/i/i, 'ee'], [/a/i, 'e'], [/e/i, 'a'],
   ];
   transforms.forEach(([rx, rep]) => {
     const v = term.replace(rx, rep);
@@ -72,6 +102,11 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
     if (!target?.term) return;
     try { audioRef.current?.pause(); } catch {}
     setPlaying(true);
+
+    // Default: device/browser English voice. Zero API calls and zero LLM/TTS cost.
+    if (speakWithDeviceVoice(target.term, delivery, teacher, () => setPlaying(false))) return;
+
+    // Legacy fallback for browsers without Web Speech support.
     try {
       const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/pronounce`, {
         method: 'POST',
@@ -80,7 +115,6 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
       });
       if (!r.ok) throw new Error('pronounce failed');
       const blob = await r.blob();
-      try { audioRef.current?.pause(); } catch {}
       audioRef.current = new Audio(URL.createObjectURL(blob));
       audioRef.current.onended = () => setPlaying(false);
       audioRef.current.onerror = () => setPlaying(false);
@@ -99,7 +133,7 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
     setFeedback(null);
     if (!target) { setDone(true); return; }
     const id = setTimeout(() => speak('normal'), 220);
-    return () => { clearTimeout(id); try { audioRef.current?.pause(); } catch {} };
+    return () => { clearTimeout(id); try { audioRef.current?.pause(); } catch {} try { window.speechSynthesis?.cancel(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
@@ -111,7 +145,8 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
         term: target.term,
         meaning: target.meaning,
         example: target.example || '',
-        source: 'word_practice_mistake',
+        dictionaryId: target.dictionaryId,
+        source: target.dictionaryId ? 'dictionary_practice_mistake' : 'word_practice_mistake',
       }, { quiet: true });
       if (saved) toast(`Nehéz szó elmentve: ${target.term}`);
       return;

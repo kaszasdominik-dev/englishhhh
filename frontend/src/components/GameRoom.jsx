@@ -35,7 +35,7 @@ export function GameRoom({ pack, topic, onClose, initialGame = 'quick' }) {
   const wrong = () => { setStreak(0); setHearts(h => { const n = h - 1; if (n <= 0) setTimeout(() => setDone(false), 700); return n; }); };
   const save = async (w) => {
     if (savedSet.has(normalizeSpeechText(w.term).toLowerCase())) { toast('Már elmentve.'); return; }
-    const r = await saveVocabulary({ term: w.term, meaning: w.meaning, example: w.example || '', source: 'game' }, { quiet: true });
+    const r = await saveVocabulary({ term: w.term, meaning: w.meaning, example: w.example || '', dictionaryId: w.dictionaryId, source: w.dictionaryId ? 'dictionary_game' : 'game' }, { quiet: true });
     if (r) toast.success(`${w.term} elmentve.`);
   };
 
@@ -87,10 +87,10 @@ function Quick({ words, round, setRound, correct, wrong, hearts, total, setDone,
   const pool = useMemo(() => shuffle(words).slice(0, total), [words, total]);
   const [locked, setLocked] = useState(false);
   const [picked, setPicked] = useState(null);
-  const enToHu = useMemo(() => Math.random() > 0.5, [round]);
+  const enToHu = round % 2 === 0;
   const target = pool[round];
   const field = enToHu ? 'meaning' : 'term';
-  const opts = useMemo(() => (target ? optionSet(target, field, words) : []), [round, target, field, words]);
+  const opts = useMemo(() => (target ? optionSet(target, field, words) : []), [target, field, words]);
   useEffect(() => { setLocked(false); setPicked(null); }, [round]);
   useEffect(() => { if (round >= total || round >= pool.length) { const id = setTimeout(() => setDone(true), 0); return () => clearTimeout(id); } }, [round, total, pool.length, setDone]);
   if (!target) return null;
@@ -124,8 +124,8 @@ function Swipe({ words, round, setRound, correct, wrong, hearts, total, setDone,
   const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
   const target = pool[round];
-  const wrongW = useMemo(() => (target ? shuffle(words.filter(w => w !== target && norm(w.meaning) !== norm(target.meaning)))[0] : null), [round, target, words]);
-  const choices = useMemo(() => shuffle([{ v: target?.meaning, ok: true }, { v: wrongW?.meaning || '—', ok: false }]), [round, target, wrongW]);
+  const wrongW = useMemo(() => (target ? shuffle(words.filter(w => w !== target && norm(w.meaning) !== norm(target.meaning)))[0] : null), [target, words]);
+  const choices = useMemo(() => shuffle([{ v: target?.meaning, ok: true }, { v: wrongW?.meaning || '—', ok: false }]), [target, wrongW]);
   useEffect(() => { x.set(0); setResult(null); setLocked(false); }, [round, x]);
   useEffect(() => { if (round >= total || round >= pool.length) { const id = setTimeout(() => setDone(true), 0); return () => clearTimeout(id); } }, [round, total, pool.length, setDone]);
   if (!target) return null;
@@ -244,8 +244,8 @@ function ImageGame({ words, round, setRound, correct, wrong, hearts, total, setD
       }
     })();
     return () => { alive = false; };
-  }, [round]);
-  const opts = useMemo(() => { if (!target) return []; const all = words.filter(imageable); const others = shuffle(all.filter(v => v !== target)).slice(0, 3).map(v => v.term); return shuffle([target.term, ...others]); }, [round, photo, target, words]);
+  }, [round, target, setDone, setRound]);
+  const opts = useMemo(() => { if (!target) return []; const all = words.filter(imageable); const others = shuffle(all.filter(v => v !== target)).slice(0, 3).map(v => v.term); return shuffle([target.term, ...others]); }, [target, words]);
   if (!target) return null;
   if (err) return <div className="text-center py-10"><p className="text-slate-300">{err}</p></div>;
   const choose = (o) => {
