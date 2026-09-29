@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from dictionary_engine import recommend_dictionary_words
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -501,72 +502,39 @@ Create a tiny visual pronunciation card for a Hungarian learner.
     except Exception:
         return JSONResponse({"error": "Nem siker\u00fclt elk\u00e9sz\u00edteni a kiejt\u00e9si k\u00e1rty\u00e1t."}, status_code=502)
 
-@api.post("/game/topic")
-async def game_topic(request: Request):
-    body = await request.json()
+async def local_dictionary_pack(body):
     requested = clean_word_field(body.get('topic'))[:80]
     level = str(body.get('level', 'B1')).upper()
     if not re.match(r'^(A1|A2|B1|B2|C1|C2)$', level):
         level = 'B1'
     count = clamp(int(body.get('count') or 10), 5, 30)
-    if not OPENAI_API_KEY:
-        return JSONResponse({"error": "OPENAI_API_KEY is not set.", "code": "NO_API_KEY"}, status_code=503)
     state = await load_state()
-    existing = [clean_word_field(v.get('term')).lower() for v in state.get('vocabulary', []) if clean_word_field(v.get('term'))][:300]
-    existing_set = set(existing)
-    item_schema = {"type": "object", "additionalProperties": False, "properties": {
-        "term": {"type": "string"}, "meaning": {"type": "string"},
-        "partOfSpeech": {"type": "string", "enum": ["noun", "verb", "adjective", "adverb", "phrase"]},
-        "example": {"type": "string"}, "imageable": {"type": "boolean"}, "imageQuery": {"type": "string"},
-        "imageTerms": {"type": "array", "items": {"type": "string"}, "minItems": 0, "maxItems": 4},
-        "visualGroup": {"type": "string"}},
-        "required": ["term", "meaning", "partOfSpeech", "example", "imageable", "imageQuery", "imageTerms", "visualGroup"]}
-    schema = {"type": "object", "additionalProperties": False, "properties": {
-        "topic": {"type": "string"}, "words": {"type": "array", "minItems": 5, "maxItems": 30, "items": item_schema}},
-        "required": ["topic", "words"]}
-    variety = f"{int(time.time())}-{random.randint(1000,999999)}"
-    topic_instr = (f"Category requested: {json.dumps(requested)}. Stay strongly inside this category, but make the selection fresh and non-obvious."
-                   if requested else "No category selected. Create a genuinely RANDOM mixed pack across unrelated useful areas. Do NOT turn it into one hidden theme.")
-    prompt = f"""Create a fresh English vocabulary pack for a Hungarian learner.
-{topic_instr}
-Learner level: {level}
-Target count: {count}
-Variety token: {variety}
-Already saved words that MUST NOT be returned: {json.dumps(existing)}
-Rules:
-- Return exactly {count} useful NEW lexical items when possible. Never reuse an already saved term or inflected variant.
-- Selection must be meaningfully random. Mix nouns, verbs, adjectives, adverbs and a few short fixed phrases.
-- term must be clean dictionary form: take, not taking; grow, not grew.
-- meaning concise natural Hungarian. example one short natural English sentence.
-- imageable=true ONLY when one stock photo can communicate the meaning with very low ambiguity. Be strict (airplane, suitcase, swim: yes; business, meeting, revenue: no).
-- If imageable=true: partOfSpeech noun/verb; imageQuery 3\u20137 English words describing one obvious subject; imageTerms 1\u20134 lowercase visual words; visualGroup a short cluster.
-- If imageable=false: imageQuery="", imageTerms=[], visualGroup="". No duplicates."""
-    try:
-        parsed = await openai_responses(prompt, 'You curate high-quality vocabulary for a polished language-learning game. Freshness, cleanliness and visual unambiguity matter.', 'livo_topic_pack_v5', schema, timeout=30)
-        seen = set()
-        words = []
-        for w in parsed.get('words', []):
-            imageable = w.get('imageable') is True
-            item = {
-                'term': clean_word_field(w.get('term')), 'meaning': clean_word_field(w.get('meaning')),
-                'partOfSpeech': w.get('partOfSpeech'), 'example': clean_word_field(w.get('example')),
-                'imageable': imageable,
-                'imageQuery': clean_image_query(w.get('imageQuery')) if imageable else '',
-                'imageTerms': [clean_image_query(x) for x in (w.get('imageTerms') or []) if clean_image_query(x)][:4] if imageable else [],
-                'visualGroup': re.sub(r'\s+', '-', clean_image_query(w.get('visualGroup')).lower()) if imageable else '',
-                'source': 'topic'}
-            k = item['term'].lower()
-            if not item['term'] or not item['meaning'] or k in seen or k in existing_set or not is_clean_generated_word(item):
-                continue
-            seen.add(k)
-            words.append(item)
-        words = words[:count]
-        if len(words) < min(4, count):
-            return JSONResponse({"error": "Most nem tal\u00e1ltam el\u00e9g \u00faj, tiszta sz\u00f3t. K\u00e9rj egy m\u00e1sik random csomagot.", "code": "TOO_FEW_NEW_WORDS"}, status_code=422)
-        return {"topic": requested, "level": level, "words": words, "excludedExisting": len(existing)}
-    except Exception as e:
-        logger.error("topic pack error %s", e)
-        return JSONResponse({"error": "Nem siker\u00fclt AI sz\u00f3csomagot k\u00e9sz\u00edteni."}, status_code=502)
+    existing = [clean_word_field(v.get('term')).lower() for v in state.get('vocabulary', []) if clean_word_field(v.get('term'))][:500]
+    words = await recommend_dictionary_words(db, requested, level, count, existing)
+    if len(words) < min(4, count):
+        total = await db.dictionary.count_documents({'practiceEligible': True})
+        code = 'DICTIONARY_NOT_READY' if total == 0 else 'TOO_FEW_DICTIONARY_WORDS'
+        message = ('A helyi szótár még nincs betöltve. Futtasd: python scripts/import_freedict_dictionary.py'
+                   if total == 0 else 'Ehhez a témához/szinthez most nincs elég helyi szó. Próbálj másik témát vagy Randomot.')
+        return JSONResponse({'error': message, 'code': code}, status_code=503 if total == 0 else 422)
+    return {'topic': requested, 'level': level, 'words': words[:count], 'excludedExisting': len(existing),
+            'source': 'local_dictionary', 'llmTokens': 0}
+
+@api.get("/dictionary/status")
+async def dictionary_status():
+    total = await db.dictionary.count_documents({})
+    eligible = await db.dictionary.count_documents({'practiceEligible': True})
+    return {'ready': eligible > 0, 'total': total, 'practiceEligible': eligible,
+            'source': 'FreeDict eng-hun', 'runtimeLlmTokens': 0}
+
+@api.post("/dictionary/recommend")
+async def dictionary_recommend(request: Request):
+    return await local_dictionary_pack(await request.json())
+
+@api.post("/game/topic")
+async def game_topic(request: Request):
+    # Kept for the existing Word Lab UI. This route is intentionally local-only.
+    return await local_dictionary_pack(await request.json())
 
 @api.get("/game/photo")
 async def game_photo(query: str = '', word: str = '', target: str = '', terms: str = ''):
@@ -692,12 +660,26 @@ async def upsert_vocabulary(request: Request):
     meaning = clean_word_field(body.get('meaning'))
     example = clean_word_field(body.get('example'))
     if not term and not meaning:
-        return JSONResponse({"error": "Adj meg legal\u00e1bb egy angol vagy magyar sz\u00f3t."}, status_code=400)
-    try:
-        checked = await validate_vocab(term, meaning, example)
-    except Exception as e:
-        logger.error("vocab validation failed %s", e)
-        return JSONResponse({"error": "A sz\u00f3ellen\u0151rz\u0151 most nem el\u00e9rhet\u0151. Pr\u00f3b\u00e1ld \u00fajra.", "code": "VOCAB_VALIDATION_UNAVAILABLE"}, status_code=503)
+        return JSONResponse({"error": "Adj meg legalább egy angol vagy magyar szót."}, status_code=400)
+
+    dictionary_id = clean_word_field(body.get('dictionaryId'))
+    catalog_word = await db.dictionary.find_one({'key': dictionary_id}) if dictionary_id else None
+    if catalog_word:
+        checked = {
+            'valid': True,
+            'reason': '',
+            'term': clean_word_field(catalog_word.get('term')),
+            'meaning': clean_word_field(catalog_word.get('meaning')),
+            'example': clean_word_field(catalog_word.get('example')),
+            'partOfSpeech': catalog_word.get('partOfSpeech') or 'other',
+            'canonicalized': term.lower() != str(catalog_word.get('term', '')).lower() or meaning != catalog_word.get('meaning', ''),
+        }
+    else:
+        try:
+            checked = await validate_vocab(term, meaning, example)
+        except Exception as e:
+            logger.error("vocab validation failed %s", e)
+            return JSONResponse({"error": "A szóellenőrző most nem elérhető. Próbáld újra.", "code": "VOCAB_VALIDATION_UNAVAILABLE"}, status_code=503)
     if not checked.get('valid') or not checked.get('term') or not checked.get('meaning'):
         return JSONResponse({"error": checked.get('reason') or "Ez nem el\u00e9g tiszta, tanulhat\u00f3 sz\u00f3.", "code": "INVALID_VOCAB"}, status_code=422)
     term, meaning, example = checked['term'], checked['meaning'], checked['example']
