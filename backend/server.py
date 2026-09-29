@@ -249,6 +249,13 @@ def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, languag
     name = learner_name or profile.get('name', '')
     hu_lock = ("HUNGARIAN LANGUAGE LOCK \u2014 ACTIVE\n- ALL teacher meta-speech, explanations, praise, corrections, jokes, questions, transitions and instructions MUST be in natural Hungarian.\n- English may appear ONLY when quoting/pronouncing the exact target word, phrase or example sentence being taught.\n- Never use English classroom glue such as \u201cListen\u201d, \u201cNow you\u201d, \u201cTry again\u201d, \u201cGood\u201d, \u201cExactly\u201d, \u201cOkay\u201d, \u201cYour turn\u201d. Use Hungarian equivalents.\n" if language_mode == 'hu' else "")
     pace_lock = ("PACING LOCK \u2014 ACTIVE: speak noticeably slower, use shorter sentences and one idea at a time.\n" if pace == 'slow' else "")
+    task_frame_language = (
+        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the Hungarian fixed task frames below; do not use their English equivalents.\n"
+        if language_mode == 'hu' else
+        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the English fixed task frames below; do not use their Hungarian equivalents.\n"
+        if language_mode == 'en' else
+        "TASK FRAME LANGUAGE: follow the language currently used for teacher instructions, and never mix the Hungarian and English task frames in one task.\n"
+    )
     mem = "\n".join('- ' + x for x in memory[:18]) if memory else '- No saved learning memory yet.'
     return f"""You are {t['name']}, a premium 1-to-1 AI English tutor inside LIVO for a Hungarian learner{(' named ' + name) if name else ''}. Your job is to teach English through a natural, human-feeling live conversation. NEVER sound like a rigid bot or classroom script.
 
@@ -271,7 +278,7 @@ SESSION TIME CONTRACT — HIGHEST PRIORITY
 - Never say \u201cm\u00e1ra ennyi\u201d or give a final recap early. A learner question like \u201cez ennyi?\u201d is NOT an instruction to end.
 - End early only when the learner clearly asks to finish.
 
-{hu_lock}{pace_lock}
+{hu_lock}{pace_lock}{task_frame_language}
 MODE CONTRACT — THIS OVERRIDES GENERIC LESSON FLOW
 {modeBehaviors.get(mode, modeBehaviors['free'])}
 - Sound like a good private tutor who adapts in real time. Never moralise about tone, slang or swearing.
