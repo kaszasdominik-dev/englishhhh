@@ -24,6 +24,10 @@ export function GameRoom({ pack, topic, onClose, initialGame = 'quick' }) {
   const reset = (g) => { setGame(g); setHearts(3); setScore(0); setStreak(0); setRound(0); setDone(null); setFeedback(null); };
   useEffect(() => { reset(initialGame); /* eslint-disable-next-line */ }, [initialGame, pack]);
 
+  // Feedback belongs to the answered card only. Clear it as soon as a new
+  // round/game is rendered so an old result can never appear under a new word.
+  useEffect(() => { setFeedback(null); }, [round, game]);
+
   const total = useMemo(() => {
     if (game === 'match') return Math.min(6, words.length);
     if (game === 'memory') return Math.min(6, words.length);
