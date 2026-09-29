@@ -33,7 +33,7 @@ function Root() {
   if (!engineRef.current) {
     engineRef.current = new LiveEngine({
       getVocab: () => dataRef.current?.vocabulary || [],
-      saveVocab: (p) => store.saveVocabulary?.(p, { quiet: false }),
+      saveVocab: (p) => store.saveVocabulary?.(p, { quiet: p?.quiet === true }),
       onData: (s) => store.setData?.(s),
       onFinished: () => setLiveOpen(false),
     });
@@ -42,7 +42,7 @@ function Root() {
   if (typeof window !== 'undefined') window.__livoEngine = engine;
   // keep callbacks fresh
   useEffect(() => {
-    engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: false });
+    engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: p?.quiet === true });
     engine.cb.onData = (s) => store.setData(s);
     engine.cb.getVocab = () => dataRef.current?.vocabulary || [];
   });
