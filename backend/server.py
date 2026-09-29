@@ -907,7 +907,7 @@ async def pronounce(request: Request):
 @api.post("/task-eval")
 async def task_eval(request: Request):
     body = await request.json()
-    kind = body.get('kind') if body.get('kind') in ('translate', 'repeat') else 'repeat'
+    kind = body.get('kind') if body.get('kind') in ('translate', 'repeat', 'meaning') else 'repeat'
     source = str(body.get('source', '')).strip()[:200]
     expected = str(body.get('expected', '')).strip()[:200]
     learner = str(body.get('learnerText', '')).strip()[:500]
@@ -922,6 +922,8 @@ async def task_eval(request: Request):
         "required": ["state", "correctAnswer", "reason"]}
     if kind == 'translate':
         task_desc = f"The learner was asked to translate this Hungarian phrase into natural English: {json.dumps(source)}. A good expected English answer is: {json.dumps(expected)}."
+    elif kind == 'meaning':
+        task_desc = f"The learner was asked to explain in Hungarian what this English word or phrase means: {json.dumps(source)}. A concise expected Hungarian meaning is: {json.dumps(expected)}."
     else:
         task_desc = f"The learner was asked to repeat/say this exact English target aloud: {json.dumps(expected or source)}."
     prompt = f"""You evaluate ONE spoken answer from a Hungarian learner in a live English lesson. Judge MEANING and correctness, NOT exact string match. ASR may mis-spell; be tolerant of spelling/punctuation/filler.
@@ -932,7 +934,7 @@ Return:
 - state = "correct" if the answer is correct or fully acceptable (minor accent/spelling/word-order variants are still correct).
 - state = "almost_correct" if the core idea is right but there is one clear fixable error (wrong tense, small grammar slip, one wrong word).
 - state = "wrong" if it is wrong, empty, off-topic, or in the wrong language.
-- correctAnswer = the clean ideal English answer.
+- correctAnswer = the clean ideal answer in the language required by the task (English for translate/repeat, Hungarian for meaning).
 - reason = ONE short, natural Hungarian sentence of feedback."""
     try:
         result = await openai_responses(prompt, 'You are a precise but fair spoken-answer evaluator. Never mark a meaning-correct answer as wrong over spelling.', 'livo_task_eval', schema)
