@@ -242,6 +242,7 @@ function WordBank({ data }) {
   let list = data.vocabulary.filter(v => ((v.term || '') + ' ' + (v.meaning || '')).toLowerCase().includes(q.toLowerCase()));
   if (filter === 'saved') list = list.filter(v => v.saved);
   if (filter === 'due') list = list.filter(v => v.status === 'uncertain' || v.status === 'learning');
+  if (filter === 'hard') list = list.filter(v => (v.status === 'uncertain') || (v.mastery ?? 40) < 60 || (v.wrong_count || 0) > (v.correct_count || 0));
   list = [...list].sort((a, b) => (a.mastery ?? 50) - (b.mastery ?? 50));
   return (
     <div className="space-y-3">
@@ -251,7 +252,7 @@ function WordBank({ data }) {
         <span className="text-xs text-ink-faint">{list.length} szó</span>
       </div>
       <div className="flex gap-2 overflow-x-auto livo-scroll">
-        {[['all', 'Összes'], ['saved', '★ Mentett'], ['due', 'Ismétlendő']].map(([id, l]) => (
+        {[['all', 'Összes'], ['saved', '★ Mentett'], ['due', 'Ismétlendő'], ['hard', 'Nehéz szavak']].map(([id, l]) => (
           <button key={id} onClick={() => setFilter(id)} className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${filter === id ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{l}</button>
         ))}
         <button data-testid="add-word-btn" onClick={() => setAdding(a => !a)} className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold bg-emerald2-bg text-emerald2 inline-flex items-center gap-1"><Plus size={13} /> Új szó</button>
