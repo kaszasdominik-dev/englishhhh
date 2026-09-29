@@ -1,17 +1,14 @@
-import React, { useState, useSyncExternalStore, useRef } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
 import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb } from 'lucide-react';
 
-// Fire on ANY release (short tap OR long-press) as long as the finger didn't drag/scroll.
-// Mobile long-press does NOT emit a `click`, so we drive word lookups from pointer events instead.
-function tapHandlers(ref, onTap) {
+// Fire immediately on press (pointerdown). Bulletproof during the live karaoke, where the caption
+// re-renders many times per second and a pointerup/click can be LOST when the pressed word node is
+// replaced mid-gesture (the browser then emits pointercancel instead of pointerup).
+function tapHandlers(onTap) {
   return {
-    onPointerDown: (e) => { ref.current = { x: e.clientX, y: e.clientY }; },
-    onPointerUp: (e) => {
-      const st = ref.current; ref.current = null;
-      if (!st || (Math.abs(e.clientX - st.x) + Math.abs(e.clientY - st.y) < 16)) onTap();
-    },
+    onPointerDown: (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; onTap(); },
   };
 }
 
@@ -19,7 +16,6 @@ export function LiveRoom({ engine }) {
   const s = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   const t = TEACHERS[s.teacher] || TEACHERS.james;
   const [showTranscript, setShowTranscript] = useState(false);
-  const tapRef = useRef(null);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
@@ -87,7 +83,7 @@ export function LiveRoom({ engine }) {
                 <p className="text-[22px] leading-relaxed font-heading font-semibold flex flex-wrap gap-x-1.5 gap-y-1">
                   {s.caption.words.map((w, i) => (
                     <span key={i} data-testid={i === 0 ? 'caption-word' : undefined}
-                      {...tapHandlers(tapRef, () => engine.lookupWord(w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, ''), s.caption.text))}
+                      {...tapHandlers(() => engine.lookupWord(w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, ''), s.caption.text))}
                       className={`kw ${i < s.caption.activeIndex ? 'text-white' : i === s.caption.activeIndex ? 'text-brand-ring bg-white/10' : 'text-slate-500'}`}>{w}</span>
                   ))}
                 </p>
@@ -446,7 +442,6 @@ const stripEdge = (w) => w.replace(/^[^\p{L}\p{N}'-]+|[^\p{L}\p{N}'-]+$/gu, '');
 
 function TranscriptPanel({ s, engine, teacher, onClose }) {
   const [sel, setSel] = useState({ turnId: null, idx: [] });
-  const tapRef = useRef(null);
   const turns = s.timeline.filter(x => normalizeSpeechText(x.text));
   const activeTurn = turns.find(x => x.id === sel.turnId);
   const activeWords = activeTurn ? normalizeSpeechText(activeTurn.text).split(/\s+/) : [];
@@ -496,7 +491,7 @@ function TranscriptPanel({ s, engine, teacher, onClose }) {
                     const active = sel.turnId === turn.id && sel.idx.includes(i);
                     return (
                       <span key={i} data-testid={isUser ? undefined : (turn.id === turns.find(x => x.role !== 'user')?.id && i === 0 ? 'transcript-word' : undefined)}
-                        {...tapHandlers(tapRef, () => toggle(turn, i))}
+                        {...tapHandlers(() => toggle(turn, i))}
                         className={`kw ${active ? 'bg-brand text-white' : (isUser ? 'text-slate-100' : 'text-slate-200')}`}>{w}</span>
                     );
                   })}
