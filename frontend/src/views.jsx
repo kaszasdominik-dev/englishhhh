@@ -197,20 +197,21 @@ export function PracticeView({ data, openLive, onTeacher }) {
 }
 
 /* ------------------------------------------------------------ Learn */
-const TABS = [['words', 'Szavak'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['homework', 'Házi']];
+const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['homework', 'Házi']];
 const TOPICS = ['', 'Üzlet', 'Nyaralás', 'Interjú', 'Repülőtér', 'Étterem', 'Hétköznapok', 'Autózás'];
 
-export function LearnView({ onPlay }) {
+export function LearnView({ onPlay, onWordPractice }) {
   const { data } = useStore();
   const [tab, setTab] = useState('words');
   return (
     <div className="px-5 pt-5 space-y-4">
-      <div className="flex gap-1 rounded-full bg-slate-100 p-1">
+      <div className="flex gap-1 rounded-full bg-slate-100 p-1 overflow-x-auto livo-scroll">
         {TABS.map(([id, label]) => (
-          <button key={id} data-testid={`learn-tab-${id}`} onClick={() => setTab(id)} className={`flex-1 rounded-full py-2 text-xs font-semibold transition-colors ${tab === id ? 'bg-white text-brand shadow-soft' : 'text-ink-mute'}`}>{label}</button>
+          <button key={id} data-testid={`learn-tab-${id}`} onClick={() => setTab(id)} className={`shrink-0 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${tab === id ? 'bg-white text-brand shadow-soft' : 'text-ink-mute'}`}>{label}</button>
         ))}
       </div>
       {tab === 'words' && <WordBank data={data} />}
+      {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} />}
       {tab === 'lab' && <WordLab data={data} onPlay={onPlay} />}
       {tab === 'grammar' && <GrammarPane data={data} />}
       {tab === 'homework' && <HomeworkPane data={data} />}
@@ -264,6 +265,105 @@ function WordBank({ data }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function WordPracticeSetup({ data, onStart }) {
+  const [source, setSource] = useState('saved');
+  const [mode, setMode] = useState('mixed');
+  const [count, setCount] = useState(5);
+  const [topic, setTopic] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [autoSaveMistakes, setAutoSaveMistakes] = useState(true);
+
+  const saved = useMemo(() => [...(data.vocabulary || [])].sort((a, b) => (a.mastery ?? 40) - (b.mastery ?? 40)), [data.vocabulary]);
+  const hard = useMemo(() => saved.filter(w => (w.status === 'uncertain') || (w.mastery ?? 40) < 60 || (w.wrong_count || 0) > (w.correct_count || 0)), [saved]);
+
+  const start = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      let pack = source === 'hard' ? hard.slice(0, count) : saved.slice(0, count);
+      if (source === 'recommended') {
+        const r = await api('/game/topic', {
+          method: 'POST',
+          body: JSON.stringify({ topic: normalizeSpeechText(topic), level: data.profile?.cefr || 'B1', count: Math.max(count, 8), forImages: false }),
+        });
+        pack = Array.isArray(r.words) ? r.words.slice(0, count) : [];
+      }
+      if (!pack.length) throw new Error(source === 'hard' ? 'Most nincs nehéz szó a listádban.' : 'Ehhez a gyakorláshoz még nincs elég szó.');
+      onStart(pack, { source, mode, count: Math.min(count, pack.length), autoSaveMistakes });
+    } catch (e) {
+      toast.error(e.message || 'Nem sikerült elindítani a szógyakorlót.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const modes = [
+    ['mixed', 'Vegyes', 'Kiejtés + helyesírás + hangzás'],
+    ['pronounce', 'Kiejtés', 'Hallgasd, ismételd, lassítsd vagy szótagold'],
+    ['dictation', 'Hallás utáni írás', 'Csak hallod a szót, neked kell leírni'],
+    ['missing', 'Hiányzó betűk', 'Egészítsd ki a hallott szót'],
+    ['sound', 'Hangcsapdák', 'ship/sheep · th · w/v · a/e'],
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="word-practice-setup">
+      <section className="rounded-[1.35rem] bg-task-bg text-task-text p-5 shadow-card">
+        <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">KÜLÖN A LIVE BESZÉLGETÉSTŐL</span>
+        <h3 className="font-heading font-bold text-xl mt-1">Precíz szógyakorló</h3>
+        <p className="text-sm text-slate-300 mt-1">A rendszer tudja, mi a feladat. Nincs töltelékduma és nincs transcriptből kitalált UI.</p>
+      </section>
+
+      <section>
+        <div className="text-xs font-semibold text-ink-mute mb-2">Miből gyakorolj?</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            ['saved', 'Szavaim', `${saved.length} szó`],
+            ['hard', 'Nehéz', `${hard.length} szó`],
+            ['recommended', 'Ajánlott', 'AI válogatás'],
+          ].map(([id, title, sub]) => (
+            <button key={id} onClick={() => setSource(id)} className={`rounded-2xl p-3 text-left ring-1 transition-all ${source === id ? 'bg-brand text-white ring-brand' : 'bg-white text-ink ring-slate-100'}`}>
+              <b className="text-sm block">{title}</b><span className={`text-[10px] ${source === id ? 'text-white/70' : 'text-ink-faint'}`}>{sub}</span>
+            </button>
+          ))}
+        </div>
+        {source === 'recommended' && (
+          <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Téma opcionális: üzlet, utazás, IT…" className="mt-2 w-full rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
+        )}
+      </section>
+
+      <section>
+        <div className="text-xs font-semibold text-ink-mute mb-2">Hogyan gyakorolj?</div>
+        <div className="space-y-2">
+          {modes.map(([id, title, sub]) => (
+            <button key={id} onClick={() => setMode(id)} className={`w-full rounded-2xl p-3.5 text-left ring-1 transition-all ${mode === id ? 'bg-brand-soft ring-brand/30' : 'bg-white ring-slate-100'}`}>
+              <div className="flex items-center justify-between"><b className="text-sm text-ink">{title}</b>{mode === id && <Check size={15} className="text-brand" />}</div>
+              <p className="text-xs text-ink-mute mt-0.5">{sub}</p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="text-xs font-semibold text-ink-mute mb-2">Kör hossza</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[5, 10, 15].map(n => <button key={n} onClick={() => setCount(n)} className={`rounded-xl py-2.5 text-sm font-semibold ${count === n ? 'bg-brand text-white' : 'bg-white text-ink-mute ring-1 ring-slate-200'}`}>{n} szó{n === 5 ? ' · ~3 perc' : ''}</button>)}
+        </div>
+      </section>
+
+      {source === 'recommended' && (
+        <label className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+          <span><b className="text-sm text-ink block">Hibás szavak mentése</b><small className="text-xs text-ink-mute">A nehéz ajánlott szó bekerül a saját listádba.</small></span>
+          <input type="checkbox" checked={autoSaveMistakes} onChange={e => setAutoSaveMistakes(e.target.checked)} className="h-5 w-5 accent-brand" />
+        </label>
+      )}
+
+      <button data-testid="start-word-practice" disabled={busy} onClick={start} className="w-full rounded-2xl bg-brand text-white py-3.5 font-bold text-sm disabled:opacity-60 inline-flex items-center justify-center gap-2">
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <AudioLines size={17} />} Gyakorlás indítása
+      </button>
     </div>
   );
 }
