@@ -5,7 +5,7 @@ Source: FreeDict English-Hungarian dictionary (GPL-2.0-or-later).
 Run from backend:
     python scripts/import_freedict_dictionary.py
 """
-import os, re, tempfile, xml.etree.ElementTree as ET
+import os, re, sys, tempfile, xml.etree.ElementTree as ET
 from pathlib import Path
 
 import requests
@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / '.env')
 from dictionary_engine import estimate_level, topic_tags, choose_meaning
 
