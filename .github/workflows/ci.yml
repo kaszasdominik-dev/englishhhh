@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: python -m py_compile backend/server.py backend/dictionary_engine.py backend/scripts/import_freedict_dictionary.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Enable Yarn
+        run: corepack enable
+      - name: Install
+        working-directory: frontend
+        run: yarn install --non-interactive
+      - name: Build
+        working-directory: frontend
+        env:
+          CI: 'true'
+          REACT_APP_BACKEND_URL: http://localhost:8000
+        run: yarn build
