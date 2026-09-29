@@ -133,7 +133,7 @@ export function LiveRoom({ engine }) {
             {s.wordPopover && (
               <motion.div data-testid="word-popover" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute left-4 right-4 bottom-32 z-30 rounded-2xl bg-white text-ink p-4 shadow-card">
                 <button data-testid="popover-close" onClick={() => engine.closeWordPopover()} className="absolute top-3 right-3 text-ink-faint"><X size={15} /></button>
-                <div className="text-[10px] tracking-widest font-bold text-ink-mute">GYORS JELENTÉS</div>
+                <div className="text-[10px] tracking-widest font-bold text-ink-mute">JELENTÉS</div>
                 <div className="flex items-center gap-2 mt-1"><b className="font-heading text-lg">{s.wordPopover.word}</b><ArrowRight size={14} className="text-ink-faint" /><strong className="text-brand">{s.wordPopover.loading ? 'Fordítás…' : (s.wordPopover.translation || '—')}</strong></div>
                 <p className="text-xs text-ink-mute mt-1">{s.wordPopover.error || s.wordPopover.contextMeaning || s.wordPopover.explanation || ''}</p>
                 {!s.wordPopover.error && (
@@ -141,7 +141,7 @@ export function LiveRoom({ engine }) {
                     <button data-testid="popover-pronounce" disabled={s.wordPopover.loading} onClick={() => engine.pronounceText(s.wordPopover.sourceLanguage === 'hu' ? s.wordPopover.translation : s.wordPopover.word)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-100 text-ink text-sm font-semibold py-2.5 px-4 disabled:opacity-50">
                       <Volume2 size={15} /> Kiejtés
                     </button>
-                    <button data-testid="popover-save" disabled={s.wordPopover.loading || s.wordPopover.saved || !s.wordPopover.translation} onClick={() => engine.saveWordPopover()} className="flex-1 rounded-full bg-brand text-white text-sm font-semibold py-2.5 disabled:opacity-50">{s.wordPopover.saved ? '✓ Mentve' : 'Mentés'}</button>
+                    <button data-testid="popover-save" disabled={s.wordPopover.loading || s.wordPopover.saving || s.wordPopover.saved || !s.wordPopover.translation} onClick={() => engine.saveWordPopover()} className="flex-1 rounded-full bg-brand text-white text-sm font-semibold py-2.5 disabled:opacity-50">{s.wordPopover.saved ? '✓ Mentve' : s.wordPopover.saving ? 'Mentés…' : 'Mentés'}</button>
                   </div>
                 )}
               </motion.div>
@@ -232,9 +232,12 @@ function TaskCard({ s, engine }) {
       {pt?.text && (() => {
         const st = pt.state || 'pending';
         const isTranslate = pt.kind === 'translate';
+        const isMeaning = pt.kind === 'meaning';
         const revealed = st === 'wrong' || st === 'dont_know';
         const englishTarget = isTranslate ? (pt.correctAnswer || pt.answer || '') : pt.text;
+        const revealedAnswer = isMeaning ? (pt.correctAnswer || pt.answer || '') : englishTarget;
         const canPronounce = !!englishTarget && (!isTranslate || revealed || st === 'correct');
+        const taskLabel = isTranslate ? 'MONDD KI ANGOLUL' : isMeaning ? 'MONDD EL, MIT JELENT' : 'MONDD KI';
         const tone = st === 'correct' ? 'bg-emerald-500/15 ring-2 ring-emerald-400/60'
           : st === 'almost_correct' ? 'bg-amber-500/15 ring-2 ring-amber-400/60'
           : st === 'wrong' ? 'bg-rose-500/12 ring-2 ring-rose-400/50'
@@ -256,17 +259,18 @@ function TaskCard({ s, engine }) {
             ) : (
               <>
                 <button data-testid="task-close" onClick={() => engine.hidePracticeTarget()} className="absolute top-4 right-4 h-6 w-6 grid place-items-center rounded-full bg-white/10 text-slate-400"><X size={13} /></button>
+                <div className="text-[10px] tracking-[0.32em] font-black text-white/55 mb-1">FELADAT</div>
                 <span data-testid="task-kind" className="text-[11px] tracking-[0.24em] font-extrabold text-task-accent">
-                  {isTranslate ? 'MONDD KI ANGOLUL' : 'ISMÉTELD UTÁNAM'}
+                  {taskLabel}
                 </span>
                 <button data-testid="task-phrase" onClick={() => engine.lookupWord(pt.text, s.caption.text)} className="mt-3 block w-full text-3xl font-heading font-extrabold text-task-text leading-snug">
                   {pt.text}
                 </button>
 
-                {revealed && englishTarget && (
+                {revealed && revealedAnswer && (
                   <div data-testid="task-answer" className="mt-3 rounded-2xl bg-white/10 px-4 py-2.5">
-                    <div className="text-[10px] tracking-widest text-slate-400">HELYES VÁLASZ</div>
-                    <b className="text-xl text-white">{englishTarget}</b>
+                    <div className="text-[10px] tracking-widest text-slate-400">{isMeaning ? 'JELENTÉS' : 'HELYES VÁLASZ'}</div>
+                    <b className="text-xl text-white">{revealedAnswer}</b>
                   </div>
                 )}
 
@@ -276,8 +280,8 @@ function TaskCard({ s, engine }) {
                   </div>
                 )}
                 {st === 'almost_correct' && <div data-testid="task-almost" className="mt-3 text-sm font-semibold text-amber-300">Majdnem! Próbáld újra.</div>}
-                {st === 'wrong' && <div data-testid="task-wrong" className="mt-3 text-sm font-semibold text-rose-300">Nem egészen — mondd ki a helyes választ.</div>}
-                {st === 'dont_know' && <div data-testid="task-dontknow" className="mt-3 text-sm font-semibold text-sky-300">Semmi baj — mondd ki utánam.</div>}
+                {st === 'wrong' && <div data-testid="task-wrong" className="mt-3 text-sm font-semibold text-rose-300">{isMeaning ? 'Nem egészen — mondd el magyarul, mit jelent.' : 'Nem egészen — mondd ki a helyes választ.'}</div>}
+                {st === 'dont_know' && <div data-testid="task-dontknow" className="mt-3 text-sm font-semibold text-sky-300">{isMeaning ? 'Semmi baj — itt a jelentés. Mondd el te is.' : 'Semmi baj — mondd ki utánam.'}</div>}
                 {pt.reason && st !== 'pending' && <p className="mt-1 text-xs text-slate-300">{pt.reason}</p>}
                 {st === 'pending' && isTranslate && pt.attempted === 'same-language' && <div className="mt-2 text-xs text-slate-400">Ezt most angolul mondd ki.</div>}
 
