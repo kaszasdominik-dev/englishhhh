@@ -339,7 +339,7 @@ function WordPracticeSetup({ data, onStart }) {
           {[
             ['saved', 'Szavaim', `${saved.length} szó`],
             ['hard', 'Nehéz', `${hard.length} szó`],
-            ['recommended', 'Ajánlott', 'AI válogatás'],
+            ['recommended', 'Ajánlott', 'Helyi válogatás · 0 token'],
           ].map(([id, title, sub]) => (
             <button key={id} onClick={() => setSource(id)} className={`rounded-2xl p-3 text-left ring-1 transition-all ${source === id ? 'bg-brand text-white ring-brand' : 'bg-white text-ink ring-slate-100'}`}>
               <b className="text-sm block">{title}</b><span className={`text-[10px] ${source === id ? 'text-white/70' : 'text-ink-faint'}`}>{sub}</span>
@@ -395,6 +395,8 @@ function WordLab({ data, onPlay }) {
   const [custom, setCustom] = useState('');
   const [count, setCount] = useState(10);
   const [busy, setBusy] = useState(false);
+  const [dictStatus, setDictStatus] = useState(null);
+  useEffect(() => { api('/dictionary/status').then(setDictStatus).catch(() => {}); }, []);
   const games = [['swipe', 'Swipe Match', 'Húzd a jó jelentés felé'], ['quick', 'Gyors kör', 'Feleletválasztós'], ['match', 'Párosító', 'Kösd össze a párokat'], ['memory', 'Memory', 'Memóriajáték']];
   const label = normalizeSpeechText(custom || topic) || 'Random';
   const launch = async (id) => {
@@ -415,6 +417,7 @@ function WordLab({ data, onPlay }) {
         <div className="flex items-center gap-2">
           <span className="text-[10px] tracking-[0.2em] font-bold text-task-accent">WORD LAB · HELYI SZÓTÁR</span>
           <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[9px] font-extrabold text-emerald-300">0 AI TOKEN</span>
+          {dictStatus?.ready && <span className="text-[9px] font-bold text-slate-400">{Number(dictStatus.practiceEligible || 0).toLocaleString('hu-HU')} gyakorló szó</span>}
         </div>
         <h3 className="font-heading font-bold text-lg mt-1 leading-tight">Válassz témát, majd indíts egy játékot.</h3>
         <p className="text-sm text-slate-300 mt-1">A csomagot a helyi angol–magyar szótár és a saját szinted alapján válogatjuk. Gyors, kiszámítható, tokenmentes.</p>
