@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Python syntax
-        run: python -m py_compile backend/server.py backend/dictionary_engine.py backend/scripts/import_freedict_dictionary.py
+        run: python -m py_compile backend/server.py backend/dictionary_engine.py backend/scripts/*.py
 
   frontend:
     runs-on: ubuntu-latest
