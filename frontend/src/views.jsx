@@ -353,12 +353,24 @@ function WordPracticeSetup({ data, onStart }) {
       <section>
         <div className="text-xs font-semibold text-ink-mute mb-2">Hogyan gyakorolj?</div>
         <div className="space-y-2">
-          {modes.map(([id, title, sub]) => (
-            <button key={id} onClick={() => setMode(id)} className={`w-full rounded-2xl p-3.5 text-left ring-1 transition-all ${mode === id ? 'bg-brand-soft ring-brand/30' : 'bg-white ring-slate-100'}`}>
-              <div className="flex items-center justify-between"><b className="text-sm text-ink">{title}</b>{mode === id && <Check size={15} className="text-brand" />}</div>
-              <p className="text-xs text-ink-mute mt-0.5">{sub}</p>
-            </button>
-          ))}
+          {modes.map(([id, title, sub]) => {
+            const recommended = id === 'mixed';
+            return (
+              <button key={id} onClick={() => setMode(id)} className={`relative w-full rounded-2xl p-3.5 text-left ring-1 transition-all ${mode === id ? 'bg-brand-soft ring-brand/30' : recommended ? 'bg-amber-50/60 ring-amber-200' : 'bg-white ring-slate-100'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <b className="text-sm text-ink inline-flex items-center gap-1.5">
+                    {recommended && <Flame size={15} className="text-amber-500 fill-amber-500" />}
+                    {title}
+                  </b>
+                  <div className="flex items-center gap-2">
+                    {recommended && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-extrabold tracking-wide text-amber-600">AJÁNLOTT</span>}
+                    {mode === id && <Check size={15} className="text-brand" />}
+                  </div>
+                </div>
+                <p className="text-xs text-ink-mute mt-0.5">{sub}</p>
+              </button>
+            );
+          })}
         </div>
       </section>
 
