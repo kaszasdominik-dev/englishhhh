@@ -494,15 +494,16 @@ export class LiveEngine {
       saved: same ? this.practiceTarget.saved : false,
     };
     this.notify();
-    if (kind === 'translate' && !same) this.prefetchPracticeAnswer(clean);
+    if ((kind === 'translate' || kind === 'meaning') && !same) this.prefetchPracticeAnswer(clean, kind);
   }
-  async prefetchPracticeAnswer(source) {
+  async prefetchPracticeAnswer(source, kind = 'translate') {
     const seq = ++this._practiceAnswerSeq;
+    const direction = kind === 'meaning' ? 'en_hu' : 'hu_en';
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction: 'hu_en', explicitLookup: true }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction, explicitLookup: true }) }).then(x => x.json());
       if (seq !== this._practiceAnswerSeq) return;
       const answer = normalizeSpeechText(r?.translation || '');
-      if (answer && this.practiceTarget?.kind === 'translate' && practiceNormAny(this.practiceTarget.text) === practiceNormAny(source)) {
+      if (answer && this.practiceTarget?.kind === kind && practiceNormAny(this.practiceTarget.text) === practiceNormAny(source)) {
         this.practiceTarget = { ...this.practiceTarget, answer };
         this.notify();
       }
@@ -551,34 +552,56 @@ export class LiveEngine {
     this.practiceTarget = { ...pt, hintLevel: level };
     this.notify();
     const src = pt.text;
-    const instr = level === 1
-      ? `The learner tapped "Segítség" (hint) for the current task ${JSON.stringify(src)}. Give ONE small, gentle hint in natural Hungarian (e.g. the first sound, the tense, or a tiny clue). Do NOT reveal the full English answer.`
-      : level === 2
-      ? `The learner tapped "Segítség" again for ${JSON.stringify(src)}. Give a BIGGER hint in natural Hungarian: the first word or the sentence structure. Still do NOT say the whole answer.`
-      : `The learner still needs help with ${JSON.stringify(src)}. Now give almost the full answer as a scaffold in natural Hungarian, leaving only the last piece for them to say, and encourage them to try.`;
+    const instr = pt.kind === 'meaning'
+      ? (level === 1
+        ? `The learner tapped "Segítség" for the meaning task ${JSON.stringify(src)}. Give ONE tiny semantic clue in natural Hungarian without saying the full Hungarian translation.`
+        : level === 2
+        ? `The learner needs a bigger hint for the meaning of ${JSON.stringify(src)}. Give a short Hungarian description or usage clue, but still do not state the exact translation.`
+        : `The learner still needs help with the meaning of ${JSON.stringify(src)}. Give an almost-complete Hungarian explanation and ask them to say the meaning themselves.`)
+      : (level === 1
+        ? `The learner tapped "Segítség" (hint) for the current task ${JSON.stringify(src)}. Give ONE small, gentle hint in natural Hungarian (e.g. the first sound, the tense, or a tiny clue). Do NOT reveal the full English answer.`
+        : level === 2
+        ? `The learner tapped "Segítség" again for ${JSON.stringify(src)}. Give a BIGGER hint in natural Hungarian: the first word or the sentence structure. Still do NOT say the whole answer.`
+        : `The learner still needs help with ${JSON.stringify(src)}. Now give almost the full answer as a scaffold in natural Hungarian, leaving only the last piece for them to say, and encourage them to try.`);
     this.oneShot(instr);
   }
-  // "Nem tudom": reveal + speak the correct answer, then ask for a repetition.
+  // "Nem tudom": reveal the answer and keep the current task type.
   async taskDontKnow() {
     const pt = this.practiceTarget; if (!pt || pt.state === 'correct') return;
-    let answer = pt.kind === 'translate' ? (pt.answer || pt.correctAnswer) : pt.text;
-    // Reveal immediately (optimistic) so there is no visible delay after the tap.
-    this.practiceTarget = { ...this.practiceTarget, state: 'dont_know', correctAnswer: answer || '', hintLevel: 0, reason: answer ? 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' : 'Egy pillanat, előkészítem a helyes választ…' };
+    const needsLookup = pt.kind === 'translate' || pt.kind === 'meaning';
+    let answer = needsLookup ? (pt.answer || pt.correctAnswer) : pt.text;
+    const meaningTask = pt.kind === 'meaning';
+    const reason = meaningTask
+      ? (answer ? 'Semmi baj — itt a jelentés. Mondd el te is röviden.' : 'Egy pillanat, megkeresem a jelentést…')
+      : (answer ? 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' : 'Egy pillanat, előkészítem a helyes választ…');
+    this.practiceTarget = { ...this.practiceTarget, state: 'dont_know', correctAnswer: answer || '', hintLevel: 0, reason };
     this.notify();
-    if (pt.kind === 'translate' && !answer) {
+
+    if (needsLookup && !answer) {
       try {
-        const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction: 'hu_en', explicitLookup: true }) }).then(x => x.json());
+        const direction = meaningTask ? 'en_hu' : 'hu_en';
+        const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction, explicitLookup: true }) }).then(x => x.json());
         answer = normalizeSpeechText(r?.translation || '');
       } catch { /* fall through */ }
       answer = answer || pt.text;
       if (this.practiceTarget && this.practiceTarget.state === 'dont_know') {
-        this.practiceTarget = { ...this.practiceTarget, correctAnswer: answer, reason: 'Semmi baj — itt a helyes válasz. Mondd ki utánam.' };
+        this.practiceTarget = {
+          ...this.practiceTarget,
+          answer,
+          correctAnswer: answer,
+          reason: meaningTask ? 'Semmi baj — itt a jelentés. Mondd el te is röviden.' : 'Semmi baj — itt a helyes válasz. Mondd ki utánam.',
+        };
         this.notify();
       }
     }
+
     answer = answer || pt.text;
     this.recordTaskSR(pt.kind === 'translate' ? answer : pt.text, 'dont_know');
-    this.oneShot(`The learner pressed "Nem tudom" (I don't know) for this task. In natural Hungarian kindly reassure them, then pronounce the correct English answer ${JSON.stringify(answer)} clearly ONCE in native English, and ask them in Hungarian to repeat it after you. Keep it short.`);
+    if (meaningTask) {
+      this.oneShot(`The learner pressed "Nem tudom" for a meaning task. The English target is ${JSON.stringify(pt.text)} and the Hungarian meaning is ${JSON.stringify(answer)}. Briefly reveal the Hungarian meaning, give one tiny usage clue, then ask the learner to tell you what it means. Do not ask them to pronounce the Hungarian answer.`);
+    } else {
+      this.oneShot(`The learner pressed "Nem tudom" (I don't know) for this task. In natural Hungarian kindly reassure them, then pronounce the correct English answer ${JSON.stringify(answer)} clearly ONCE in native English, and ask them in Hungarian to repeat it after you. Keep it short.`);
+    }
   }
   async recordTaskSR(term, outcome) {
     const clean = normalizeSpeechText(term || '').toLowerCase(); if (!clean) return;
@@ -626,9 +649,10 @@ export class LiveEngine {
   async evaluateTaskAnswer(text) {
     const pt = this.practiceTarget; if (!pt || pt.state === 'correct') return;
     const said = normalizeSpeechText(text); if (!said) return;
-    // After "Nem tudom", we wait for a repetition of the revealed answer.
-    const kind = pt.state === 'dont_know' ? 'repeat' : pt.kind;
-    const expected = kind === 'translate'
+    // After "Nem tudom", pronunciation/translation tasks wait for repetition.
+    // A meaning task remains a meaning task: the learner should answer in Hungarian.
+    const kind = pt.state === 'dont_know' && pt.kind !== 'meaning' ? 'repeat' : pt.kind;
+    const expected = (kind === 'translate' || kind === 'meaning')
       ? (pt.answer || pt.correctAnswer || '')
       : (pt.state === 'dont_know' ? (pt.correctAnswer || pt.text) : pt.text);
     // Translate task answered in Hungarian → don't penalise, just nudge to answer in English.
@@ -640,8 +664,12 @@ export class LiveEngine {
     }
     // Fast local "correct" path (avoids latency for obvious matches).
     if (expected) {
-      const a = practiceNorm(said), b = practiceNorm(expected);
-      if (b && a && (a.includes(b) || b.includes(a) || practicePhraseSimilarity(expected, said) >= 0.82)) {
+      const a = kind === 'meaning' ? practiceNormAny(said) : practiceNorm(said);
+      const b = kind === 'meaning' ? practiceNormAny(expected) : practiceNorm(expected);
+      const similar = kind === 'meaning'
+        ? (a && b && (a.includes(b) || b.includes(a)))
+        : practicePhraseSimilarity(expected, said) >= 0.82;
+      if (b && a && (a.includes(b) || b.includes(a) || similar)) {
         this.markTaskResolved('correct', expected, 'Szép! Megvan.'); return;
       }
     }
@@ -738,15 +766,23 @@ export class LiveEngine {
   }
   closeWordPopover() { this.wordPopover = null; this.notify(); }
   async saveWordPopover() {
-    const p = this.wordPopover; if (!p || !p.translation || p.saved) return;
+    const p = this.wordPopover; if (!p || !p.translation || p.saved || p.saving) return;
     const lang = p.sourceLanguage || 'en';
     const payload = lang === 'hu' ? { term: p.translation, meaning: p.word } : { term: p.word, meaning: p.translation };
-    this.wordPopover = { ...p, saved: true }; this.notify(); // optimistic feedback
+    this.wordPopover = { ...p, saving: true, error: '' }; this.notify();
     try {
-      await this.cb.saveVocab?.({ ...payload, saved: true, source: 'caption_click', sourceLanguage: lang });
+      const savedWord = await this.cb.saveVocab?.({ ...payload, saved: true, source: 'caption_click', sourceLanguage: lang });
+      if (!savedWord) throw new Error('save rejected');
+      if (this.wordPopover?.word === p.word) {
+        this.wordPopover = { ...this.wordPopover, saving: false, saved: true, error: '' };
+        this.notify();
+      }
     } catch (e) {
       console.error('[LIVO] save word failed', e);
-      if (this.wordPopover?.word === p.word) { this.wordPopover = { ...p, saved: false, error: 'Nem sikerült menteni. Próbáld újra.' }; this.notify(); }
+      if (this.wordPopover?.word === p.word) {
+        this.wordPopover = { ...p, saving: false, saved: false, error: 'Nem sikerült menteni. Próbáld újra.' };
+        this.notify();
+      }
     }
   }
   async savePracticeTarget() {
