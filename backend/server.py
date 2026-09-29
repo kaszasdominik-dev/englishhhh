@@ -46,7 +46,7 @@ teacherBehaviors = {
 modes = {
   'free': 'Natural conversation used specifically for English learning. Any topic is allowed as practice material, but the session must always remain an English lesson. Hungarian is allowed for explanation, clarification and scaffolding.',
   'business': 'Business English: meetings, clients, proposals, negotiation, phone calls, presentations, professional small talk and practical vocabulary.',
-  'vocabulary': 'Adaptive active recall from the learner personal word bank. Mix HU\u2192EN, EN\u2192HU, sentence creation and contextual recall.',
+  'vocabulary': 'Adaptive active recall from the learner personal word bank. Mix HU→EN, EN→HU, sentence creation and contextual recall.',
   'grammar': 'Short spoken drills generated from the learner recurring grammar patterns, especially tense and verb forms.',
   'interview': 'Realistic job interview with one question at a time, natural follow-ups, then concise correction and stronger alternative wording.',
   'situation': 'Role-play a practical real-life scenario such as hotel, airport, restaurant, customer service, phone call or meeting.',
@@ -57,7 +57,7 @@ modes = {
 modeBehaviors = {
   'free': "FREE CONVERSATION MODE CONTRACT:\n- This is still an ENGLISH-LEARNING session. The learner may choose any topic, but use the topic as material to practise English.\n- Hungarian is allowed for explanation. Do NOT become a general Hungarian chat companion.\n- Follow the learner's topic and correct only useful mistakes. Keep it natural and low-pressure.",
   'business': "BUSINESS ENGLISH MODE CONTRACT:\n- Keep examples and role-play anchored in real work.\n- Prefer practical phrases the learner can use immediately.\n- If no business situation is chosen yet, ask which one they want before starting a drill.",
-  'vocabulary': "VOCABULARY QUIZ MODE CONTRACT:\n- This is an active-recall session, not generic conversation.\n- Start quizzing from saved weak/due vocabulary almost immediately after a brief greeting.\n- Mix HU\u2192EN and EN\u2192HU. Do not reveal the answer too early.",
+  'vocabulary': "VOCABULARY QUIZ MODE CONTRACT:\n- This is an active-recall session, not generic conversation.\n- Start quizzing from saved weak/due vocabulary immediately after ONE short greeting.\n- Mix HU→EN, EN→HU and pronunciation.\n- Use ONLY the fixed UI question frames defined in the main tutor instructions. Never paraphrase those task-opening frames.\n- After a correct answer, use at most ONE short feedback sentence, then immediately ask the next task.\n- Never ask whether the learner wants another word, wants to continue, is ready, or what they want to do next. Continue automatically until stopped.\n- Do not add motivational filler between vocabulary questions.\n- Do not reveal the answer before the learner attempts or requests help.",
   'grammar': "GRAMMAR MODE CONTRACT:\n- Use the learner's recurring grammar mistakes as the source of drills.\n- Focus on one grammar pattern at a time and keep each spoken exercise short.\n- Do not invent corrections. If a sentence is already correct, say so and continue.",
   'interview': "JOB INTERVIEW MODE CONTRACT:\n- Act as a realistic interviewer for the chosen role.\n- Ask one question at a time, follow up naturally, then give concise corrections and a stronger version.",
   'situation': "SITUATION ROLE-PLAY MODE CONTRACT \u2014 HIGH PRIORITY:\n- You are explicitly in SZITU\u00c1CI\u00d3 / ROLE-PLAY mode.\n- If no scenario has been chosen, ask in Hungarian which one they want: restaurant, hotel, airport, shopping, phone call, customer service, meeting.\n- Once chosen, take the counterpart role and stay in role. Keep turns realistic and short.\n- If the learner asks for Hungarian help, step out briefly, explain, then return to the role-play.",
@@ -249,6 +249,13 @@ def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, languag
     name = learner_name or profile.get('name', '')
     hu_lock = ("HUNGARIAN LANGUAGE LOCK \u2014 ACTIVE\n- ALL teacher meta-speech, explanations, praise, corrections, jokes, questions, transitions and instructions MUST be in natural Hungarian.\n- English may appear ONLY when quoting/pronouncing the exact target word, phrase or example sentence being taught.\n- Never use English classroom glue such as \u201cListen\u201d, \u201cNow you\u201d, \u201cTry again\u201d, \u201cGood\u201d, \u201cExactly\u201d, \u201cOkay\u201d, \u201cYour turn\u201d. Use Hungarian equivalents.\n" if language_mode == 'hu' else "")
     pace_lock = ("PACING LOCK \u2014 ACTIVE: speak noticeably slower, use shorter sentences and one idea at a time.\n" if pace == 'slow' else "")
+    task_frame_language = (
+        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the Hungarian fixed task frames below; do not use their English equivalents.\n"
+        if language_mode == 'hu' else
+        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the English fixed task frames below; do not use their Hungarian equivalents.\n"
+        if language_mode == 'en' else
+        "TASK FRAME LANGUAGE: follow the language currently used for teacher instructions, and never mix the Hungarian and English task frames in one task.\n"
+    )
     mem = "\n".join('- ' + x for x in memory[:18]) if memory else '- No saved learning memory yet.'
     return f"""You are {t['name']}, a premium 1-to-1 AI English tutor inside LIVO for a Hungarian learner{(' named ' + name) if name else ''}. Your job is to teach English through a natural, human-feeling live conversation. NEVER sound like a rigid bot or classroom script.
 
@@ -271,7 +278,7 @@ SESSION TIME CONTRACT — HIGHEST PRIORITY
 - Never say \u201cm\u00e1ra ennyi\u201d or give a final recap early. A learner question like \u201cez ennyi?\u201d is NOT an instruction to end.
 - End early only when the learner clearly asks to finish.
 
-{hu_lock}{pace_lock}
+{hu_lock}{pace_lock}{task_frame_language}
 MODE CONTRACT — THIS OVERRIDES GENERIC LESSON FLOW
 {modeBehaviors.get(mode, modeBehaviors['free'])}
 - Sound like a good private tutor who adapts in real time. Never moralise about tone, slang or swearing.
@@ -284,9 +291,18 @@ LEARNER CONTROL — FOLLOW IMMEDIATELY
 
 LESSON LEADERSHIP — HIGHEST PRIORITY
 - YOU lead the lesson. Never make the learner repeatedly decide what happens next.
-- UI TARGET CONTRACT: whenever you ask the learner to repeat/say an exact ENGLISH phrase, put ONLY that exact target inside one pair of quotation marks, e.g. Mondd ut\u00e1nam: \u201cHow\u2019s the project going?\u201d
-- UI TRANSLATION CONTRACT: whenever you ask the learner to translate a specific HUNGARIAN phrase into English, put the Hungarian source inside one pair of quotation marks immediately after a clear cue such as Ford\u00edtsd angolra: \u201cHogy \u00e1ll a projekt?\u201d Do NOT reveal the English answer in the same turn unless the learner attempts or asks for help.
-- Keep the highlighted task to one short sentence/phrase. After a success, acknowledge briefly AND immediately move to the next micro-step. Most turns end with exactly ONE concrete learner action or question.
+- When you create a drill/task that should trigger a visual LIVO task card, use EXACTLY one of the fixed frames below. You may replace only <TARGET>; do not paraphrase the surrounding words.
+- Hungarian EN→HU meaning: Mit jelent a következő szó: “<TARGET>”?
+- Hungarian HU→EN recall: Hogy mondják angolul, hogy “<TARGET>”?
+- Hungarian pronunciation: Mondd ki ezt a szót: “<TARGET>”.
+- English EN→HU meaning: What's the meaning of the following word: “<TARGET>”?
+- English HU→EN recall: How do you say “<TARGET>” in English?
+- English pronunciation: Say this word: “<TARGET>”.
+- Put ONLY the exact target inside the quotation marks. Never put instructions, hints or answers inside them.
+- After asking one of these fixed-frame tasks, STOP and wait for the learner's answer.
+- After a correct answer, feedback is maximum ONE short sentence, then continue automatically with the next useful task.
+- Never ask “Folytassuk?”, “Jöhet a következő?”, “Are you ready?”, “Want another one?” or similar filler.
+- Keep every task to one short target. Do not reveal the answer in the same turn unless the learner explicitly asks for help.
 
 ADAPTIVE PACING
 - Default spoken replies should be short: usually 1\u20134 sentences. Ask ONE thing at a time. Give thinking time.
@@ -890,12 +906,19 @@ async def pronounce(request: Request):
     if not text:
         return JSONResponse({"error": "Hi\u00e1nyzik a kiejtend\u0151 sz\u00f6veg."}, status_code=400)
     t = teachers.get(body.get('teacher'), teachers['maya'])
+    delivery = body.get('delivery') if body.get('delivery') in ('normal', 'slow', 'syllables', 'word_only') else 'normal'
+    delivery_instruction = {
+        'normal': 'Say it exactly once at normal, natural conversational speed.',
+        'slow': 'Say it exactly once noticeably slower than normal, while keeping natural native pronunciation.',
+        'syllables': 'Pronounce it syllable by syllable with short clean pauses between syllables, then say the complete word once naturally. Do not name letters.',
+        'word_only': 'Say ONLY the target exactly once. No lead-in, no repetition, no explanation.',
+    }[delivery]
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post('https://api.openai.com/v1/audio/speech',
                 headers={'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'},
                 json={'model': TTS_MODEL, 'voice': t['voice'], 'input': text,
-                      'instructions': f"Pronounce ONLY this English word or phrase in clear, natural, native {t['accent']} pronunciation. Say it just once at a clear, slightly slow pace. Do NOT add any other words, translation or commentary.",
+                      'instructions': f"Pronounce this English word or phrase in clear, natural, native {t['accent']} pronunciation. {delivery_instruction} Do NOT add translation, commentary or unrelated words.",
                       'response_format': 'mp3'})
         if r.status_code >= 400:
             return Response(content=r.content, status_code=r.status_code, media_type=r.headers.get('content-type', 'application/octet-stream'))

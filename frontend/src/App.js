@@ -8,6 +8,7 @@ import { TeacherSheet } from '@/components/TeacherSheet';
 import { Onboarding } from '@/components/Onboarding';
 import { LiveRoom } from '@/components/LiveRoom';
 import { GameRoom } from '@/components/GameRoom';
+import { WordPracticeRoom } from '@/components/WordPracticeRoom';
 import { Home, MessagesSquare, GraduationCap, TrendingUp, User, Mic } from 'lucide-react';
 
 const NAV = [
@@ -25,13 +26,14 @@ function Root() {
   const [teacherSheet, setTeacherSheet] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
   const [game, setGame] = useState(null); // { pack, topic }
+  const [wordPractice, setWordPractice] = useState(null); // { pack, config }
 
   const dataRef = useRef(data); dataRef.current = data;
   const engineRef = useRef(null);
   if (!engineRef.current) {
     engineRef.current = new LiveEngine({
       getVocab: () => dataRef.current?.vocabulary || [],
-      saveVocab: (p) => store.saveVocabulary?.(p, { quiet: false }),
+      saveVocab: (p) => store.saveVocabulary?.(p, { quiet: p?.quiet === true }),
       onData: (s) => store.setData?.(s),
       onFinished: () => setLiveOpen(false),
     });
@@ -40,14 +42,15 @@ function Root() {
   if (typeof window !== 'undefined') window.__livoEngine = engine;
   // keep callbacks fresh
   useEffect(() => {
-    engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: false });
+    engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: p?.quiet === true });
     engine.cb.onData = (s) => store.setData(s);
     engine.cb.getVocab = () => dataRef.current?.vocabulary || [];
   });
 
-  const openLive = (mode = 'business') => {
+  const openLive = (mode = 'business', options = {}) => {
     const teacher = TEACHERS[data?.profile?.teacher] ? data.profile.teacher : 'maya';
-    const langMode = (data?.user?.locale || 'hu-HU').toLowerCase().startsWith('hu') ? 'hu' : 'en';
+    const defaultLang = (data?.user?.locale || 'hu-HU').toLowerCase().startsWith('hu') ? 'hu' : 'en';
+    const langMode = options.langMode === 'en' ? 'en' : options.langMode === 'hu' ? 'hu' : defaultLang;
     engine.open({ mode, teacher, profile: data?.profile || {}, vocab: data?.vocabulary || [], langMode });
     setLiveOpen(true);
   };
@@ -64,7 +67,7 @@ function Root() {
         <main className="livo-scroll flex-1 overflow-y-auto overflow-x-hidden pb-28">
           {view === 'home' && <HomeView data={data} openLive={openLive} goto={setView} onTeacher={() => setTeacherSheet(true)} />}
           {view === 'practice' && <PracticeView data={data} openLive={openLive} onTeacher={() => setTeacherSheet(true)} />}
-          {view === 'learn' && <LearnView onPlay={(pack, topic, id) => setGame({ pack, topic, id })} />}
+          {view === 'learn' && <LearnView onPlay={(pack, topic, id) => setGame({ pack, topic, id })} onWordPractice={(pack, config) => setWordPractice({ pack, config })} />}
           {view === 'progress' && <ProgressView data={data} />}
           {view === 'profile' && <ProfileView onTeacher={() => setTeacherSheet(true)} />}
         </main>
@@ -73,6 +76,7 @@ function Root() {
         {teacherSheet && <TeacherSheet engine={engine} liveOpen={liveOpen} onClose={() => setTeacherSheet(false)} />}
         {liveOpen && <LiveRoom engine={engine} />}
         {game && <GameRoom pack={game.pack} topic={game.topic} initialGame={game.id || 'quick'} onClose={() => setGame(null)} />}
+        {wordPractice && <WordPracticeRoom pack={wordPractice.pack} config={wordPractice.config} onClose={() => setWordPractice(null)} />}
         {!onboarded && <Onboarding onDone={(mode) => { if (mode) openLive(mode); }} />}
       </div>
     </div>

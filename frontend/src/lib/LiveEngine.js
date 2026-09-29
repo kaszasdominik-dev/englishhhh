@@ -524,10 +524,56 @@ export class LiveEngine {
       this.notify();
       setTimeout(() => { if (this.practiceTarget?.state === 'correct' && this.practiceTarget.text === key) this.hidePracticeTarget(); }, 2600);
     } else {
-      if (state === 'wrong') this.recordTaskSR(pt.kind === 'translate' ? (answer || pt.answer || '') : pt.text, 'wrong');
+      if (state === 'wrong') {
+        this.recordTaskSR(pt.kind === 'translate' ? (answer || pt.answer || '') : pt.text, 'wrong');
+        this.capturePracticeMistake(pt, answer).catch(() => {});
+      }
       this.notify();
     }
   }
+  async capturePracticeMistake(pt, resolvedAnswer = '') {
+    if (!pt) return;
+    let term = '', meaning = '';
+    if (pt.kind === 'translate') {
+      term = normalizeSpeechText(resolvedAnswer || pt.correctAnswer || pt.answer || '');
+      meaning = normalizeSpeechText(pt.text || '');
+    } else if (pt.kind === 'meaning') {
+      term = normalizeSpeechText(pt.text || '');
+      meaning = normalizeSpeechText(resolvedAnswer || pt.correctAnswer || pt.answer || '');
+    } else {
+      term = normalizeSpeechText(pt.text || '');
+    }
+    if (!term || term.split(/\s+/).length > 5) return;
+
+    const already = (this.cb.getVocab?.() || []).some(v => String(v.term || '').toLowerCase() === term.toLowerCase());
+    if (already) return;
+
+    if (!meaning) {
+      try {
+        const r = await fetch(`${API}/word-help`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: term, context: this.lastByRole.assistant?.text || term, direction: 'en_hu', explicitLookup: true }),
+        }).then(x => x.json());
+        if (r?.saveable === false || r?.error) return;
+        meaning = normalizeSpeechText(r?.translation || '');
+      } catch { return; }
+    }
+    if (!meaning) return;
+
+    try {
+      await this.cb.saveVocab?.({
+        term,
+        meaning,
+        example: '',
+        saved: true,
+        source: 'live_task_mistake',
+        sourceLanguage: 'en',
+        quiet: true,
+      });
+    } catch { /* non-blocking */ }
+  }
+
   // Speak ONLY the English target with clean native pronunciation (server TTS).
   async pronounceText(text) {
     const clean = normalizeSpeechText(text || ''); if (!clean) return;
@@ -597,6 +643,7 @@ export class LiveEngine {
 
     answer = answer || pt.text;
     this.recordTaskSR(pt.kind === 'translate' ? answer : pt.text, 'dont_know');
+    this.capturePracticeMistake(pt, answer).catch(() => {});
     if (meaningTask) {
       this.oneShot(`The learner pressed "Nem tudom" for a meaning task. The English target is ${JSON.stringify(pt.text)} and the Hungarian meaning is ${JSON.stringify(answer)}. Briefly reveal the Hungarian meaning, give one tiny usage clue, then ask the learner to tell you what it means. Do not ask them to pronounce the Hungarian answer.`);
     } else {

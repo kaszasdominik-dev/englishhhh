@@ -108,9 +108,32 @@ export function extractPracticeInstruction(text = '') {
   };
   const quotedTarget = () => quotedAll.length ? cleanTarget(quotedAll[quotedAll.length - 1]) : '';
 
+  // 0) Fixed LIVO task protocol. These sentence frames are intentionally deterministic so
+  // the UI never has to infer task intent from creative tutor wording.
+  const fixedMeaningHu = clean.match(/^mit\s+jelent\s+a\s+következő\s+szó\s*:\s*[“„"]?(.{1,120}?)[”"]?\s*\?*$/i);
+  const fixedMeaningEn = clean.match(/^(?:what['’]?s|what\s+is)\s+the\s+meaning\s+of\s+the\s+following\s+word\s*:\s*[“„"]?(.{1,120}?)[”"]?\s*\?*$/i);
+  if (fixedMeaningHu || fixedMeaningEn) {
+    const target = cleanTarget((fixedMeaningHu || fixedMeaningEn)[1]);
+    if (target) return { text: target, kind: 'meaning' };
+  }
+
+  const fixedTranslateHu = clean.match(/^hogy\s+mondják\s+angolul\s*,?\s+hogy\s+[“„"]?(.{1,120}?)[”"]?\s*\?*$/i);
+  const fixedTranslateEn = clean.match(/^how\s+do\s+you\s+say\s+[“„"]?(.{1,120}?)[”"]?\s+in\s+english\s*\?*$/i);
+  if (fixedTranslateHu || fixedTranslateEn) {
+    const target = cleanTarget((fixedTranslateHu || fixedTranslateEn)[1]);
+    if (target) return { text: target, kind: 'translate' };
+  }
+
+  const fixedRepeatHu = clean.match(/^mondd\s+ki\s+ezt\s+a\s+szót\s*:\s*[“„"]?(.{1,120}?)[”"]?\s*[.!]*$/i);
+  const fixedRepeatEn = clean.match(/^say\s+this\s+word\s*:\s*[“„"]?(.{1,120}?)[”"]?\s*[.!]*$/i);
+  if (fixedRepeatHu || fixedRepeatEn) {
+    const target = cleanTarget((fixedRepeatHu || fixedRepeatEn)[1]);
+    if (target) return { text: target, kind: 'repeat' };
+  }
+
   // 1) Meaning/definition task. Examples:
   // "Mondd el, mit jelent: revenue", "Mit jelent a revenue?", "What does revenue mean?"
-  const meaningCue = /(?:mondd\s+el[,]?\s*(?:hogy\s+)?mit\s+jelent|mit\s+jelent|mi\s+(?:a|az)\s+jelent[eé]se|magyarázd\s+el[,]?\s*(?:hogy\s+)?mit\s+jelent|what\s+does\b.*\bmean|tell\s+me\s+what\b.*\bmeans?)/i;
+  const meaningCue = /(?:mondd\s+el[,]?\s*(?:hogy\s+)?mit\s+jelent|mit\s+jelent|mi\s+(?:a|az)\s+jelent[eé]se|magyarázd\s+el[,]?\s*(?:hogy\s+)?mit\s+jelent|what\s+does\b.*\bmean|what['’]?s\s+the\s+meaning|what\s+is\s+the\s+meaning|tell\s+me\s+what\b.*\bmeans?)/i;
   if (meaningCue.test(clean)) {
     let target = quotedTarget() || targetAfterColon();
 
