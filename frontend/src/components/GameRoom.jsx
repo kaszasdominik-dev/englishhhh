@@ -87,7 +87,7 @@ function Quick({ words, round, setRound, correct, wrong, hearts, total, setDone,
   const pool = useMemo(() => shuffle(words).slice(0, total), [words, total]);
   const [locked, setLocked] = useState(false);
   const [picked, setPicked] = useState(null);
-  const enToHu = useMemo(() => Math.random() > 0.5, [target]);
+  const enToHu = round % 2 === 0;
   const target = pool[round];
   const field = enToHu ? 'meaning' : 'term';
   const opts = useMemo(() => (target ? optionSet(target, field, words) : []), [target, field, words]);
