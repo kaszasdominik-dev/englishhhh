@@ -61,7 +61,7 @@ function soundOptions(term, pool) {
 
   const transforms = [
     [/(^|[^s])th/i, '$1t'], [/^w/i, 'v'], [/^v/i, 'w'],
-    [/ee/i, 'i'], [/i/i, 'ee'], [/a/i, 'e'], [/e/i, 'a'],
+    [/ee/i, 'i'], [/i/i, 'ee'], [/a/i, 'e'], [/e/i, 'a'],
   ];
   transforms.forEach(([rx, rep]) => {
     const v = term.replace(rx, rep);
