@@ -47,6 +47,12 @@ const SOUND_PAIRS = [
 
 const norm = (v) => normalizeSpeechText(v || '').toLowerCase();
 
+function stopAudioPlayback(audioRef) {
+  const audio = audioRef?.current;
+  try { audio?.pause(); } catch {}
+  try { window.speechSynthesis?.cancel(); } catch {}
+}
+
 function roughSyllableText(value = '') {
   return String(value).split(/\s+/).map(word => {
     const clean = word.replace(/[^a-z'-]/gi, '');
@@ -145,40 +151,26 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
 
   const speak = async (delivery = 'normal') => {
     if (!target?.term) return;
-    try { audioRef.current?.pause(); } catch {}
+    stopAudioPlayback(audioRef);
     setPlaying(true);
 
-    // Default: device/browser English voice. Zero API calls and zero LLM/TTS cost.
-    if (speakWithDeviceVoice(target.term, delivery, teacher, () => setPlaying(false))) return;
-
-    // Legacy fallback for browsers without Web Speech support.
-    try {
-      const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/pronounce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: target.term, teacher, delivery }),
-      });
-      if (!r.ok) throw new Error('pronounce failed');
-      const blob = await r.blob();
-      audioRef.current = new Audio(URL.createObjectURL(blob));
-      audioRef.current.onended = () => setPlaying(false);
-      audioRef.current.onerror = () => setPlaying(false);
-      await audioRef.current.play();
-    } catch {
+    // Strict zero-token path: Word Practice NEVER calls OpenAI/TTS.
+    const ok = speakWithDeviceVoice(target.term, delivery, teacher, () => setPlaying(false));
+    if (!ok) {
       setPlaying(false);
-      toast.error('Most nem sikerült lejátszani a szót.');
+      toast.error('Ehhez a gyakorlóhoz böngészős beszédhang szükséges. Próbáld Chrome vagy Edge böngészőben.');
     }
   };
 
   useEffect(() => {
-    try { audioRef.current?.pause(); } catch {}
+    stopAudioPlayback(audioRef);
     setPlaying(false);
     setAnswer('');
     setLocked(false);
     setFeedback(null);
     if (!target) { setDone(true); return; }
     const id = ['meaning', 'translation'].includes(mode) ? null : setTimeout(() => speak('normal'), 220);
-    return () => { if (id) clearTimeout(id); try { audioRef.current?.pause(); } catch {} try { window.speechSynthesis?.cancel(); } catch {} };
+    return () => { if (id) clearTimeout(id); stopAudioPlayback(audioRef); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round, mode]);
 
