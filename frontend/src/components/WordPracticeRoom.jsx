@@ -69,7 +69,8 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   const teacher = data?.profile?.teacher || 'maya';
 
   const speak = async (delivery = 'normal') => {
-    if (!target?.term || playing) return;
+    if (!target?.term) return;
+    try { audioRef.current?.pause(); } catch {}
     setPlaying(true);
     try {
       const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/pronounce`, {
@@ -91,12 +92,14 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   };
 
   useEffect(() => {
+    try { audioRef.current?.pause(); } catch {}
+    setPlaying(false);
     setAnswer('');
     setLocked(false);
     setFeedback(null);
     if (!target) { setDone(true); return; }
     const id = setTimeout(() => speak('normal'), 220);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); try { audioRef.current?.pause(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
