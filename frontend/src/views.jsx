@@ -301,9 +301,9 @@ function WordPracticeSetup({ data, onStart }) {
     try {
       let pack = source === 'hard' ? hard.slice(0, count) : saved.slice(0, count);
       if (source === 'recommended') {
-        const r = await api('/game/topic', {
+        const r = await api('/dictionary/recommend', {
           method: 'POST',
-          body: JSON.stringify({ topic: normalizeSpeechText(topic), level: data.profile?.cefr || 'B1', count: Math.max(count, 8), forImages: false }),
+          body: JSON.stringify({ topic: normalizeSpeechText(topic), level: data.profile?.cefr || 'B1', count: Math.max(count, 8) }),
         });
         pack = Array.isArray(r.words) ? r.words.slice(0, count) : [];
       }
@@ -317,7 +317,7 @@ function WordPracticeSetup({ data, onStart }) {
   };
 
   const modes = [
-    ['mixed', 'Vegyes', 'Kiejtés + helyesírás + hangzás', true],
+    ['mixed', 'Vegyes', 'A leggyengébb készségedet választja: jelentés · HU→EN · helyesírás · kiejtés', true],
     ['pronounce', 'Kiejtés', 'Hallgasd, ismételd, lassítsd vagy szótagold', false],
     ['dictation', 'Hallás utáni írás', 'Csak hallod a szót, neked kell leírni', false],
     ['missing', 'Hiányzó betűk', 'Egészítsd ki a hallott szót', false],

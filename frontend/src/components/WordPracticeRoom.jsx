@@ -5,7 +5,39 @@ import { useStore } from '@/lib/store';
 import { ArrowRight, Check, Ear, Gauge, HelpCircle, RotateCcw, Save, Snail, Volume2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const ROUND_ORDER = ['pronounce', 'dictation', 'missing', 'sound'];
+const ROUND_ORDER = ['meaning', 'translation', 'dictation', 'missing', 'sound', 'pronounce'];
+const SKILLS = ['meaning', 'translation', 'spelling', 'pronunciation'];
+
+function skillForMode(mode) {
+  if (mode === 'meaning') return 'meaning';
+  if (mode === 'translation') return 'translation';
+  if (mode === 'dictation' || mode === 'missing') return 'spelling';
+  return 'pronunciation';
+}
+
+function skillLabel(skill) {
+  return ({
+    meaning: 'jelentés',
+    translation: 'HU → EN',
+    spelling: 'helyesírás',
+    pronunciation: 'kiejtés',
+  })[skill] || skill;
+}
+
+function mixedModeFor(word, round) {
+  const mastery = word?.skillMastery;
+  if (!mastery || !SKILLS.some(k => Number.isFinite(Number(mastery[k])))) {
+    return ROUND_ORDER[round % ROUND_ORDER.length];
+  }
+  const values = SKILLS.map(k => [k, Number.isFinite(Number(mastery[k])) ? Number(mastery[k]) : 40]);
+  const min = Math.min(...values.map(x => x[1]));
+  const tied = values.filter(x => x[1] === min).map(x => x[0]);
+  const weakest = tied[round % tied.length];
+  if (weakest === 'meaning') return 'meaning';
+  if (weakest === 'translation') return 'translation';
+  if (weakest === 'spelling') return round % 2 ? 'missing' : 'dictation';
+  return round % 2 ? 'sound' : 'pronounce';
+}
 
 const SOUND_PAIRS = [
   ['ship', 'sheep'], ['live', 'leave'], ['sit', 'seat'], ['fill', 'feel'], ['bit', 'beat'],
@@ -76,6 +108,18 @@ function soundOptions(term, pool) {
   return [...new Set([term, ...distractors])].slice(0, 4).sort(() => Math.random() - 0.5);
 }
 
+function meaningOptions(target, pool) {
+  if (!target) return [];
+  const answer = normalizeSpeechText(target.meaning || '');
+  const distractors = pool
+    .filter(w => w !== target && norm(w.meaning) !== norm(answer))
+    .map(w => normalizeSpeechText(w.meaning || ''))
+    .filter(Boolean);
+  return [...new Set([answer, ...distractors])]
+    .slice(0, 4)
+    .sort(() => Math.random() - 0.5);
+}
+
 export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   const { data, saveVocabulary, setData } = useStore();
   const words = useMemo(() => uniqueBy(
@@ -93,8 +137,9 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   const audioRef = useRef(null);
 
   const target = words[round];
-  const mode = config.mode === 'mixed' ? ROUND_ORDER[round % ROUND_ORDER.length] : (config.mode || 'dictation');
+  const mode = config.mode === 'mixed' ? mixedModeFor(target, round) : (config.mode || 'dictation');
   const options = useMemo(() => target ? soundOptions(target.term, words) : [], [target, words]);
+  const meanings = useMemo(() => meaningOptions(target, words), [target, words]);
 
   const teacher = data?.profile?.teacher || 'maya';
 
@@ -132,14 +177,15 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
     setLocked(false);
     setFeedback(null);
     if (!target) { setDone(true); return; }
-    const id = setTimeout(() => speak('normal'), 220);
-    return () => { clearTimeout(id); try { audioRef.current?.pause(); } catch {} try { window.speechSynthesis?.cancel(); } catch {} };
+    const id = ['meaning', 'translation'].includes(mode) ? null : setTimeout(() => speak('normal'), 220);
+    return () => { if (id) clearTimeout(id); try { audioRef.current?.pause(); } catch {} try { window.speechSynthesis?.cancel(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round]);
+  }, [round, mode]);
 
   const persistResult = async (outcome) => {
     if (!target) return;
-    const isSaved = (data?.vocabulary || []).some(v => norm(v.term) === norm(target.term));
+    let isSaved = (data?.vocabulary || []).some(v => norm(v.term) === norm(target.term));
+
     if (!isSaved && outcome !== 'correct' && config.autoSaveMistakes) {
       const saved = await saveVocabulary({
         term: target.term,
@@ -148,17 +194,26 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
         dictionaryId: target.dictionaryId,
         source: target.dictionaryId ? 'dictionary_practice_mistake' : 'word_practice_mistake',
       }, { quiet: true });
-      if (saved) toast(`Nehéz szó elmentve: ${target.term}`);
-      return;
+      if (saved) {
+        isSaved = true;
+        toast(`Nehéz szó elmentve: ${target.term}`);
+      }
     }
-    if (isSaved) {
+
+    if (isSaved || target.dictionaryId) {
       try {
         const r = await api('/game/result', {
           method: 'POST',
-          body: JSON.stringify({ term: target.term, outcome, game: `word_practice_${mode}` }),
+          body: JSON.stringify({
+            term: target.term,
+            dictionaryId: target.dictionaryId || '',
+            outcome,
+            game: `word_practice_${mode}`,
+            skill: skillForMode(mode),
+          }),
         });
         if (r?.state) setData(r.state);
-      } catch { /* non-blocking */ }
+      } catch { /* practice must keep moving even if progress sync fails */ }
     }
   };
 
@@ -174,6 +229,12 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
     if (!target || !answer.trim()) return;
     const ok = norm(answer) === norm(target.term);
     finishRound(ok, ok ? 'Helyes.' : `A helyes írásmód: ${target.term}`);
+  };
+
+  const chooseMeaning = (o) => {
+    if (!target) return;
+    const ok = norm(o) === norm(target.meaning);
+    finishRound(ok, ok ? 'Helyes.' : `${target.term} = ${target.meaning}`);
   };
 
   const chooseSound = (o) => {
@@ -219,6 +280,41 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
               <div className="text-[10px] tracking-[0.28em] font-extrabold text-brand-ring">FELADAT</div>
               <h2 className="font-heading font-extrabold text-2xl mt-2">{taskTitle(mode)}</h2>
               <p className="text-sm text-slate-400 mt-1">{taskSubtitle(mode)}</p>
+              {config.mode === 'mixed' && (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-3 py-1 text-[10px] font-extrabold text-amber-200">
+                  🔥 ADAPTÍV · {skillLabel(skillForMode(mode)).toUpperCase()}
+                  {target?.skillMastery?.[skillForMode(mode)] != null && <> · {target.skillMastery[skillForMode(mode)]}%</>}
+                </div>
+              )}
+
+              {mode === 'meaning' && (
+                <div className="mt-6">
+                  <div className="text-4xl font-heading font-extrabold">{target.term}</div>
+                  <div className="grid grid-cols-1 gap-2 mt-5">
+                    {meanings.map(o => (
+                      <button key={o} disabled={locked} onClick={() => chooseMeaning(o)} className="rounded-2xl bg-white/10 ring-1 ring-white/10 px-4 py-3 text-sm font-semibold active:scale-[.98] disabled:opacity-60">{o}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mode === 'translation' && (
+                <div className="mt-6">
+                  <div className="text-3xl font-heading font-extrabold">{target.meaning}</div>
+                  <input
+                    data-testid="translation-input"
+                    value={answer}
+                    onChange={e => setAnswer(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && submitTyped()}
+                    disabled={locked}
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Írd le angolul"
+                    className="mt-5 w-full rounded-2xl bg-white/10 ring-1 ring-white/10 px-4 py-3.5 text-center text-lg font-semibold outline-none focus:ring-brand"
+                  />
+                </div>
+              )}
 
               {mode === 'pronounce' && (
                 <div className="mt-6">
@@ -275,12 +371,14 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
                 </div>
               )}
 
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <button onClick={() => speak('normal')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Volume2 size={16} /> Mondd újra</button>
-                <button onClick={() => speak('slow')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Snail size={16} /> Lassabban</button>
-                <button onClick={() => speak('syllables')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Gauge size={16} /> Szótagolva</button>
-                <button onClick={() => speak('word_only')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Volume2 size={16} /> Csak a szót</button>
-              </div>
+              {!['meaning', 'translation'].includes(mode) && (
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button onClick={() => speak('normal')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Volume2 size={16} /> Mondd újra</button>
+                  <button onClick={() => speak('slow')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Snail size={16} /> Lassabban</button>
+                  <button onClick={() => speak('syllables')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Gauge size={16} /> Szótagolva</button>
+                  <button onClick={() => speak('word_only')} disabled={playing} className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold inline-flex justify-center items-center gap-2"><Volume2 size={16} /> Csak a szót</button>
+                </div>
+              )}
 
               {mode === 'pronounce' && !locked && (
                 <div className="grid grid-cols-2 gap-2 mt-4">
@@ -289,7 +387,7 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
                 </div>
               )}
 
-              {(mode === 'dictation' || mode === 'missing') && !locked && (
+              {(mode === 'translation' || mode === 'dictation' || mode === 'missing') && !locked && (
                 <button onClick={submitTyped} disabled={!answer.trim()} className="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold disabled:opacity-40">Ellenőrzés</button>
               )}
 
@@ -310,8 +408,17 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
               <div className="text-[10px] tracking-widest text-slate-500 font-bold">AKTUÁLIS SZÓ</div>
               <div className="mt-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <b className="text-sm block truncate">{locked || mode === 'pronounce' || mode === 'missing' ? target.term : '••••••'}</b>
+                  <b className="text-sm block truncate">{locked || ['meaning', 'pronounce', 'missing'].includes(mode) ? target.term : '••••••'}</b>
                   <span className="text-xs text-slate-500">{locked ? target.meaning : 'A megoldást csak válasz után mutatjuk.'}</span>
+                  {target?.skillMastery && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {SKILLS.map(skill => (
+                        <span key={skill} className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-slate-500">
+                          {skillLabel(skill)} {target.skillMastery[skill] ?? 40}%
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {locked && <Save size={16} className="text-slate-500" />}
               </div>
@@ -325,6 +432,8 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
 
 function labelMode(mode) {
   return ({
+    meaning: 'Jelentés',
+    translation: 'Magyar → angol',
     pronounce: 'Kiejtés',
     dictation: 'Hallás utáni írás',
     missing: 'Hiányzó betűk',
@@ -334,6 +443,8 @@ function labelMode(mode) {
 
 function taskTitle(mode) {
   return ({
+    meaning: 'Mit jelent?',
+    translation: 'Hogy mondják angolul?',
     pronounce: 'Mondd ki utánam',
     dictation: 'Írd le, amit hallasz',
     missing: 'Egészítsd ki a szót',
@@ -343,6 +454,8 @@ function taskTitle(mode) {
 
 function taskSubtitle(mode) {
   return ({
+    meaning: 'Válaszd ki a magyar jelentést.',
+    translation: 'Írd be az angol szót a magyar jelentés alapján.',
     pronounce: 'Hallgasd meg tisztán, majd ismételd el.',
     dictation: 'A szó nincs kiírva. Csak a hang alapján dolgozz.',
     missing: 'A jelentés segít, de az írásmódot neked kell tudnod.',
