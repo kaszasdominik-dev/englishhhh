@@ -35,7 +35,7 @@ export function GameRoom({ pack, topic, onClose, initialGame = 'quick' }) {
   const wrong = () => { setStreak(0); setHearts(h => { const n = h - 1; if (n <= 0) setTimeout(() => setDone(false), 700); return n; }); };
   const save = async (w) => {
     if (savedSet.has(normalizeSpeechText(w.term).toLowerCase())) { toast('Már elmentve.'); return; }
-    const r = await saveVocabulary({ term: w.term, meaning: w.meaning, example: w.example || '', source: 'game' }, { quiet: true });
+    const r = await saveVocabulary({ term: w.term, meaning: w.meaning, example: w.example || '', dictionaryId: w.dictionaryId, source: w.dictionaryId ? 'dictionary_game' : 'game' }, { quiet: true });
     if (r) toast.success(`${w.term} elmentve.`);
   };
 
