@@ -15,6 +15,15 @@ function skillForMode(mode) {
   return 'pronunciation';
 }
 
+function skillLabel(skill) {
+  return ({
+    meaning: 'jelentés',
+    translation: 'HU → EN',
+    spelling: 'helyesírás',
+    pronunciation: 'kiejtés',
+  })[skill] || skill;
+}
+
 function mixedModeFor(word, round) {
   const mastery = word?.skillMastery;
   if (!mastery || !SKILLS.some(k => Number.isFinite(Number(mastery[k])))) {
@@ -271,6 +280,12 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
               <div className="text-[10px] tracking-[0.28em] font-extrabold text-brand-ring">FELADAT</div>
               <h2 className="font-heading font-extrabold text-2xl mt-2">{taskTitle(mode)}</h2>
               <p className="text-sm text-slate-400 mt-1">{taskSubtitle(mode)}</p>
+              {config.mode === 'mixed' && (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-3 py-1 text-[10px] font-extrabold text-amber-200">
+                  🔥 ADAPTÍV · {skillLabel(skillForMode(mode)).toUpperCase()}
+                  {target?.skillMastery?.[skillForMode(mode)] != null && <> · {target.skillMastery[skillForMode(mode)]}%</>}
+                </div>
+              )}
 
               {mode === 'meaning' && (
                 <div className="mt-6">
@@ -395,6 +410,15 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
                 <div className="min-w-0">
                   <b className="text-sm block truncate">{locked || ['meaning', 'pronounce', 'missing'].includes(mode) ? target.term : '••••••'}</b>
                   <span className="text-xs text-slate-500">{locked ? target.meaning : 'A megoldást csak válasz után mutatjuk.'}</span>
+                  {target?.skillMastery && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {SKILLS.map(skill => (
+                        <span key={skill} className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-slate-500">
+                          {skillLabel(skill)} {target.skillMastery[skill] ?? 40}%
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {locked && <Save size={16} className="text-slate-500" />}
               </div>
