@@ -90,7 +90,10 @@ def main():
             freq = float(zipf_frequency(term, 'en')) if zipf_frequency else 3.5
             tags = topic_tags(term, meanings)
             level = estimate_level(freq)
-            practice_eligible = freq >= 3.0 and len(term) <= 36
+            # Keep raw phrases in the searchable catalog, but do not auto-recommend
+            # them. FreeDict contains many historical/idiomatic multi-word entries
+            # that are poor default material without curation.
+            practice_eligible = freq >= 3.0 and len(term) <= 36 and len(term.split()) == 1
             eligible += int(practice_eligible)
 
             batch.append({
