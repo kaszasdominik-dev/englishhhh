@@ -63,7 +63,7 @@ When progress exists, **Vegyes / 🔥 Ajánlott** chooses the weakest skill for 
 
 ## Audio
 
-Word Practice first uses the browser/OS **Web Speech API**. This has no OpenAI API call and no LLM/TTS token cost. The existing server `/api/pronounce` route remains only as a compatibility fallback when browser speech synthesis is unavailable.
+Word Practice uses only the browser/OS **Web Speech API**. It never calls OpenAI/TTS, so the Word Practice audio path stays at 0 OpenAI runtime tokens/cost. On a browser without speech synthesis the UI asks the learner to use a supported browser instead. The server `/api/pronounce` route remains available for other LIVO features, but Word Practice does not call it.
 
 ## Source / license notes
 
