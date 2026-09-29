@@ -68,7 +68,7 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
           <h3 className="font-heading font-bold text-ink">Ma ezt érdemes gyakorolnod</h3>
         </div>
         <FocusCard onClick={() => openLive('business')} icon={Briefcase} title="Business English" sub="Negotiation · 12–20 perc" tag="Folytatás" />
-        <FocusCard onClick={() => openLive('vocabulary')} icon={Sparkles} title={`${data.vocabulary.filter(v => v.status === 'uncertain').length} bizonytalan szó`} sub={due.map(x => x.term).join(' · ') || 'ismétlés'} tag="4 perc" />
+        <FocusCard onClick={() => goto('learn')} icon={Sparkles} title="Szógyakorló" sub={due.map(x => x.term).join(' · ') || 'kiejtés · helyesírás · ismétlés'} tag="3–5 perc" />
         <FocusCard onClick={() => openLive('grammar')} icon={Wand2} title="Past simple" sub="take → took · grow → grew" tag="6 perc" />
       </section>
 
@@ -161,6 +161,10 @@ function FocusCard({ onClick, icon: Icon, title, sub, tag }) {
 
 export function PracticeView({ data, openLive, onTeacher }) {
   const t = TEACHERS[data.profile.teacher] || TEACHERS.james;
+  const [langMode, setLangMode] = useState(() => localStorage.getItem('livo_live_language') || 'hu');
+  const setLanguage = (value) => { setLangMode(value); localStorage.setItem('livo_live_language', value); };
+  const liveModes = Object.values(MODES).filter(m => m.id !== 'vocabulary');
+
   return (
     <div className="px-5 pt-5 space-y-5">
       <button onClick={onTeacher} data-testid="practice-teacher" className="w-full flex items-center gap-3 rounded-[1.25rem] bg-white p-3 shadow-soft ring-1 ring-slate-100 active:scale-[.99] transition-transform">
@@ -168,12 +172,22 @@ export function PracticeView({ data, openLive, onTeacher }) {
         <span className="flex-1 text-left"><small className="text-[10px] tracking-widest text-ink-mute font-semibold">TANÁR</small><b className="block text-ink">{t.name}</b></span>
         <span className="text-xs font-semibold text-brand">Csere</span>
       </button>
+
+      <section className="rounded-[1.25rem] bg-white p-4 shadow-soft ring-1 ring-slate-100">
+        <div className="text-xs font-semibold text-ink-mute mb-2">Az óra nyelve</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setLanguage('hu')} className={`rounded-xl py-2.5 text-sm font-semibold ${langMode === 'hu' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Főleg magyarul</button>
+          <button onClick={() => setLanguage('en')} className={`rounded-xl py-2.5 text-sm font-semibold ${langMode === 'en' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Főleg angolul</button>
+        </div>
+        <p className="text-[11px] text-ink-faint mt-2">A szógyakorló külön a Tanulás menüben van; a Live itt folyékony beszélgetésre marad.</p>
+      </section>
+
       <div className="grid grid-cols-1 gap-3">
-        {Object.values(MODES).map((m) => {
+        {liveModes.map((m) => {
           const Icon = ICONS[m.icon] || Sparkles;
           const featured = m.tag === 'AJÁNLOTT';
           return (
-            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => openLive(m.id)}
+            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => openLive(m.id, { langMode })}
               className={`relative overflow-hidden text-left rounded-[1.35rem] p-5 active:scale-[.98] transition-transform ${featured ? 'bg-task-bg text-task-text shadow-card' : 'bg-white text-ink shadow-soft ring-1 ring-slate-100'}`}>
               {featured && <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand/40 blur-2xl" />}
               <div className="relative flex items-start gap-3">
