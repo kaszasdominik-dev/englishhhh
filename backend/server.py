@@ -1216,9 +1216,10 @@ Vocabulary that ALREADY existed before this session (EXCLUDE from vocabulary out
 Existing grammar patterns: {json.dumps(state.get('grammar', []))}
 Session mode: {body.get('mode', 'business')}
 Scenario id: {body.get('scenarioId') or ''}
+Role-play controller observations (use ONLY when supported by the transcript): {json.dumps((body.get('observedMistakes') or [])[:20])}
 Duration seconds: {duration}
 Transcript JSON: {json.dumps(transcript)}
-Analyse ONLY this session. Preserve the learner exact wording in correction.original. Do not invent errors. Hungarian explanations preferred. For vocabulary: ONLY genuinely useful English words/phrases that appear in THIS transcript and were NOT in the baseline. Update mastery cautiously (delta -6..+8). Homework 3\u201310 minutes based on this session."""
+Analyse ONLY this session. If this is a scenario session, judge whether the learner communicated successfully in the real-life situation, then identify the most useful concrete English mistakes or missing phrases to practise. Preserve the learner exact wording in correction.original. Do not invent errors. Hungarian explanations preferred. For vocabulary: ONLY genuinely useful English words/phrases that appear in THIS transcript and were NOT in the baseline. Update mastery cautiously (delta -6..+8). Homework 3\u201310 minutes based on this session."""
         try:
             result = await openai_responses(prompt, 'You are LIVO lesson analyst. Return rigorous structured learning data, not generic praise.', 'livo_session_analysis', schema, timeout=12)
         except Exception as e:
