@@ -904,15 +904,8 @@ export class LiveEngine {
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       if (this.situationHelpArmed) {
-        const r = await fetch(`${API}/scenario/help`, {
-          method:'POST', signal:ctrl.signal, headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ scenarioId:this.scenario.id, stepIndex:this.situationStepIndex, question:text }),
-        }).then(x=>x.json());
-        if (seq !== this.turnCheckSeq) return;
         this.situationHelpArmed = false;
-        const opening = this.currentSituationStep()?.opening || '';
-        this.appendInstruction(`HELP MODE IS NOW OVER. Return immediately to role as ${this.scenario.aiRole}. Stay on scenario step ${this.currentSituationStep()?.id || ''}.`);
-        this.oneShot(`Briefly answer the learner's one help question in Hungarian using this approved help: ${JSON.stringify(r.answer || '')}. Then say in English: ${JSON.stringify(opening)}. Do not add another teaching explanation.`);
+        this.situationClearHelpAfterResponse = true;
         this.notify();
         return;
       }
