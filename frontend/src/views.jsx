@@ -4,6 +4,7 @@ import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
 import { TEACHERS, MODES, MODE_NAMES, pct, computeStreak, normalizeSpeechText } from '@/lib/livo';
 import { FIXED_STARTER_TASKS } from '@/lib/learningTasks';
+import QuestionPracticeRoom from '@/components/QuestionPracticeRoom';
 import { toast } from 'sonner';
 import {
   ArrowRight, Briefcase, MessagesSquare, Sparkles, Wand2, UserRoundCheck, Clapperboard,
@@ -212,7 +213,7 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
 }
 
 /* ------------------------------------------------------------ Learn */
-const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['focus', 'Gyakorlandó'], ['homework', 'Házi']];
+const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['sentences', 'Mondatok'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['focus', 'Gyakorlandó'], ['homework', 'Házi']];
 const TOPICS = ['', 'Üzlet', 'Nyaralás', 'Interjú', 'Repülőtér', 'Étterem', 'Hétköznapok', 'Autózás'];
 
 export function LearnView({ onPlay, onWordPractice, openLive }) {
@@ -227,6 +228,7 @@ export function LearnView({ onPlay, onWordPractice, openLive }) {
       </div>
       {tab === 'words' && <WordBank data={data} />}
       {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} onLiveStart={(task) => openLive?.('vocabulary', { initialTask: task })} />}
+      {tab === 'sentences' && <QuestionPracticeRoom defaultLevel={data.profile?.cefr || 'B1'} />}
       {tab === 'lab' && <WordLab data={data} onPlay={onPlay} />}
       {tab === 'grammar' && <GrammarPane data={data} />}
       {tab === 'focus' && <PracticeFocusPane data={data} />}
