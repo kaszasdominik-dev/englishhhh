@@ -90,10 +90,16 @@ def main():
             freq = float(zipf_frequency(term, 'en')) if zipf_frequency else 3.5
             tags = topic_tags(term, meanings)
             level = estimate_level(freq)
+            primary_category = tags[0] if tags else 'general'
+            learning_band = 'foundation' if freq >= 5.25 else ('core' if freq >= 4.75 else ('intermediate' if freq >= 4.20 else ('advanced' if freq >= 3.40 else 'extended')))
+            word_tags = []
+            if not tags: word_tags.append('general_word')
+            if freq < 3.4: word_tags.append('difficult_word')
+            if freq < 3.0: word_tags.append('less_common')
             # Keep raw phrases in the searchable catalog, but do not auto-recommend
             # them. FreeDict contains many historical/idiomatic multi-word entries
             # that are poor default material without curation.
-            practice_eligible = freq >= 3.0 and len(term) <= 36 and len(term.split()) == 1
+            practice_eligible = freq >= 2.55 and len(term) <= 36 and len(term.split()) == 1
             eligible += int(practice_eligible)
 
             batch.append({
@@ -107,6 +113,9 @@ def main():
                 'frequency': round(freq, 4),
                 'level': level,
                 'topics': tags,
+                'primaryCategory': primary_category,
+                'learningBand': learning_band,
+                'wordTags': word_tags,
                 'quality': quality_score(term, freq, meanings),
                 'practiceEligible': practice_eligible,
                 'source': 'freedict-eng-hun',
@@ -128,8 +137,14 @@ def main():
         col.create_index([('termLower', ASCENDING)])
         col.create_index([('practiceEligible', ASCENDING), ('level', ASCENDING), ('frequency', DESCENDING)])
         col.create_index([('topics', ASCENDING), ('level', ASCENDING), ('frequency', DESCENDING)])
+        col.create_index([('primaryCategory', ASCENDING), ('learningBand', ASCENDING), ('frequency', DESCENDING)])
+        col.create_index([('wordTags', ASCENDING), ('practiceEligible', ASCENDING)])
         col.create_index([('term', 'text'), ('meanings', 'text')])
         print(f'\nKész: {total:,} bejegyzés, ebből {eligible:,} gyakorlásra ajánlott.')
+        if eligible < 50000:
+            print('FIGYELEM: a forrás aktuális verziójából 50 000-nél kevesebb practiceEligible szó lett. A teljes katalógus ettől még elérhető.')
+        else:
+            print('50 000+ kategorizált szó elérhető a gyakorlómotor számára.')
         print('A LIVO Word Lab / Ajánlott mostantól ebből dolgozik, LLM token nélkül.')
     finally:
         try: os.remove(path)
