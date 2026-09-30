@@ -99,7 +99,7 @@ def main():
             # Keep raw phrases in the searchable catalog, but do not auto-recommend
             # them. FreeDict contains many historical/idiomatic multi-word entries
             # that are poor default material without curation.
-            practice_eligible = freq >= 2.55 and len(term) <= 36 and len(term.split()) == 1
+            practice_eligible = len(term) <= 36 and len(term.split()) == 1
             eligible += int(practice_eligible)
 
             batch.append({
