@@ -1,4 +1,5 @@
 import { API } from './api';
+import { liveKindForTask, normalizeLearningTask, taskToLiveInstruction } from './learningTasks';
 import {
   TEACHERS, MODE_NAMES, normalizeSpeechText, cleanAssistantDisplayText,
   extractPracticeInstruction, practiceNorm, practiceNormAny, practicePhraseSimilarity,
@@ -45,6 +46,7 @@ export class LiveEngine {
     this.reconnecting = false; this.reconnectFailed = false; this.reconnectAttempt = 0; this.resumeAfterReconnect = false;
     this._practiceAnswerSeq = 0;
     this.pendingPron = null; this.pronTimer = null;
+    this.pendingInitialTask = null;
     this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null;
     this.diag = [];
   }
@@ -76,10 +78,10 @@ export class LiveEngine {
   }
 
   // ---------- lifecycle ----------
-  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], langMode = 'hu' } = {}) {
+  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], langMode = 'hu', initialTask = null } = {}) {
     this.hardCleanup(false);
     this.reset();
-    this.mode = mode; this.teacher = teacher; this.profile = profile; this.langMode = langMode;
+    this.mode = mode; this.teacher = teacher; this.profile = profile; this.langMode = langMode; this.pendingInitialTask = initialTask ? normalizeLearningTask(initialTask) : null;
     this.caption = { ...this.caption, teacher, fallback: `Nyomd meg az Indítás gombot. ${TEACHERS[teacher]?.name || 'A tanár'} azonnal köszön, aztán indul a beszélgetés.` };
     this.baselineVocab = (vocab || []).map(v => normalizeSpeechText(v.term || '').toLowerCase()).filter(Boolean);
     this.timeLeft = this.sessionMinutes * 60;
@@ -358,8 +360,13 @@ export class LiveEngine {
       if (type === 'response.done' || type === 'response.completed') {
         clearTimeout(this.greetingWatch);
         const last = this.lastByRole.assistant;
-        if (this.greetingPhase === 'pending' || this.greetingPhase === 'speaking') { this.greetingPhase = 'done'; this.greetingRequested = true; }
+        const finishedGreeting = this.greetingPhase === 'pending' || this.greetingPhase === 'speaking';
+        if (finishedGreeting) { this.greetingPhase = 'done'; this.greetingRequested = true; }
         if (last) { this.updatePracticeFromAssistant(last); this.detectMisunderstanding(last.text); this.maybePronunciationFeedback(last.text); }
+        if (finishedGreeting && this.pendingInitialTask) {
+          const task = this.pendingInitialTask; this.pendingInitialTask = null;
+          setTimeout(() => this.presentLearningTask(task, { speak: true }), 250);
+        }
         this.scheduleInactivityPause();
         if (this.greetingPhase === 'done' && !this.userSpeaking && !this.serverSpeechActive && !this.timeLimitReached && this.idleGuideCount < 2) this.scheduleIdleNudge();
         if (this.timeLimitReached && !this.finishing) this.hardStop();
@@ -415,7 +422,8 @@ export class LiveEngine {
       pronunciation: 'Ez Kiejtés mód. Kérdezd meg, melyik szót szeretné gyakorolni.',
       exam: 'Ez Vizsga mód. Mondd, hogy ez nem hivatalos vizsga, majd adj egy könnyű feladatot.',
     };
-    this.appendInstruction(`THIS IS THE FIRST RESPONSE. Your FIRST audible words MUST be exactly: "Szia, ${name}! ${t.name} vagyok." Say that greeting ONCE, no preamble. NEVER output stage directions. ${this.langMode === 'hu' ? 'All meta-speech is Hungarian; English only as the exact learning target.' : ''} ${byMode[this.mode] || byMode.free} Keep it short: greeting plus ONE next learning question.`);
+    const nextStep = this.pendingInitialTask ? 'A fixed learning task will follow immediately after this greeting. Do NOT ask any other question yet.' : `${byMode[this.mode] || byMode.free} Keep it short: greeting plus ONE next learning question.`;
+    this.appendInstruction(`THIS IS THE FIRST RESPONSE. Your FIRST audible words MUST be exactly: "Szia, ${name}! ${t.name} vagyok." Say that greeting ONCE, no preamble. NEVER output stage directions. ${this.langMode === 'hu' ? 'All meta-speech is Hungarian; English only as the exact learning target.' : ''} ${nextStep}`);
     this.manualResponseInFlight = true;
     this.send({ type: 'response.create', event_id: rid('greet') });
     clearTimeout(this.greetingWatch);
@@ -478,23 +486,46 @@ export class LiveEngine {
   }
 
   // ---------- practice target ----------
-  setPracticeTarget(text, turnId = '', kind = 'repeat') {
+  setPracticeTarget(text, turnId = '', kind = 'repeat', meta = {}) {
     const clean = normalizeSpeechText(text).replace(/^["“„]+|["”]+$/g, '').trim(); if (!clean) return;
     const same = this.practiceTarget && practiceNormAny(this.practiceTarget.text) === practiceNormAny(clean) && this.practiceTarget.kind === kind;
+    const expected = normalizeSpeechText(meta.expectedAnswer || meta.expected_answer || '');
     this.practiceTarget = {
       text: clean, turnId, kind,
+      taskId: meta.taskId || meta.task_id || (same ? this.practiceTarget.taskId : turnId),
+      taskType: meta.taskType || meta.task_type || (same ? this.practiceTarget.taskType : null),
+      source: meta.source || (same ? this.practiceTarget.source : 'transcript'),
+      acceptedAnswers: meta.acceptedAnswers || meta.accepted_answers || (same ? this.practiceTarget.acceptedAnswers : []),
       state: same ? (this.practiceTarget.state || 'pending') : 'pending',
       hintLevel: same ? (this.practiceTarget.hintLevel || 0) : 0,
       completed: same ? !!this.practiceTarget.completed : false,
       attempted: same ? this.practiceTarget.attempted : false,
-      answer: same ? this.practiceTarget.answer : null,
-      correctAnswer: same ? this.practiceTarget.correctAnswer : null,
+      answer: expected || (same ? this.practiceTarget.answer : null),
+      correctAnswer: expected || (same ? this.practiceTarget.correctAnswer : null),
       reason: same ? this.practiceTarget.reason : null,
       matched: same ? this.practiceTarget.matched : null,
       saved: same ? this.practiceTarget.saved : false,
     };
     this.notify();
-    if ((kind === 'translate' || kind === 'meaning') && !same) this.prefetchPracticeAnswer(clean, kind);
+    if ((kind === 'translate' || kind === 'meaning') && !same && !expected) this.prefetchPracticeAnswer(clean, kind);
+  }
+
+  presentLearningTask(rawTask, { speak = true } = {}) {
+    const task = normalizeLearningTask(rawTask);
+    if (!task.display_text) return null;
+    const kind = liveKindForTask(task);
+    this.setPracticeTarget(task.display_text, task.id, kind, {
+      taskId: task.id,
+      taskType: task.type,
+      source: task.source,
+      expectedAnswer: task.expected_answer,
+      acceptedAnswers: task.accepted_answers,
+    });
+    if (speak && this.connected) {
+      const spoken = taskToLiveInstruction(task);
+      this.oneShot(`Say this fixed learning task naturally in Hungarian, without revealing the answer: ${JSON.stringify(spoken)}. Do not paraphrase the target. Stop after the question and wait for the learner.`);
+    }
+    return task;
   }
   async prefetchPracticeAnswer(source, kind = 'translate') {
     const seq = ++this._practiceAnswerSeq;

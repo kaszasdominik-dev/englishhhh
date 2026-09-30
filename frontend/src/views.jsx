@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
 import { TEACHERS, MODES, MODE_NAMES, pct, computeStreak, normalizeSpeechText } from '@/lib/livo';
+import { FIXED_STARTER_TASKS } from '@/lib/learningTasks';
 import { toast } from 'sonner';
 import {
   ArrowRight, Briefcase, MessagesSquare, Sparkles, Wand2, UserRoundCheck, Clapperboard,
@@ -214,7 +215,7 @@ export function PracticeView({ data, openLive, onTeacher }) {
 const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['homework', 'Házi']];
 const TOPICS = ['', 'Üzlet', 'Nyaralás', 'Interjú', 'Repülőtér', 'Étterem', 'Hétköznapok', 'Autózás'];
 
-export function LearnView({ onPlay, onWordPractice }) {
+export function LearnView({ onPlay, onWordPractice, openLive }) {
   const { data } = useStore();
   const [tab, setTab] = useState('words');
   return (
@@ -225,7 +226,7 @@ export function LearnView({ onPlay, onWordPractice }) {
         ))}
       </div>
       {tab === 'words' && <WordBank data={data} />}
-      {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} />}
+      {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} onLiveStart={(task) => openLive?.('vocabulary', { initialTask: task })} />}
       {tab === 'lab' && <WordLab data={data} onPlay={onPlay} />}
       {tab === 'grammar' && <GrammarPane data={data} />}
       {tab === 'homework' && <HomeworkPane data={data} />}
@@ -284,7 +285,7 @@ function WordBank({ data }) {
   );
 }
 
-function WordPracticeSetup({ data, onStart }) {
+function WordPracticeSetup({ data, onStart, onLiveStart }) {
   const [source, setSource] = useState('saved');
   const [mode, setMode] = useState('mixed');
   const [count, setCount] = useState(5);
@@ -300,6 +301,12 @@ function WordPracticeSetup({ data, onStart }) {
     setBusy(true);
     try {
       let pack = source === 'hard' ? hard.slice(0, count) : saved.slice(0, count);
+      if (source === 'fixed') {
+        pack = FIXED_STARTER_TASKS
+          .filter(t => t.type === 'translate_to_english' || t.type === 'vocabulary_recall')
+          .slice(0, count)
+          .map(t => ({ id: t.id, term: t.expected_answer, meaning: t.display_text, learningTask: t, mastery: 40, status: 'uncertain' }));
+      }
       if (source === 'recommended') {
         const r = await api('/dictionary/recommend', {
           method: 'POST',
@@ -308,7 +315,7 @@ function WordPracticeSetup({ data, onStart }) {
         pack = Array.isArray(r.words) ? r.words.slice(0, count) : [];
       }
       if (!pack.length) throw new Error(source === 'hard' ? 'Most nincs nehéz szó a listádban.' : 'Ehhez a gyakorláshoz még nincs elég szó.');
-      onStart(pack, { source, mode, count: Math.min(count, pack.length), autoSaveMistakes });
+      onStart(pack, { source, mode: source === 'fixed' ? 'translation' : mode, count: Math.min(count, pack.length), autoSaveMistakes: source === 'fixed' ? false : autoSaveMistakes });
     } catch (e) {
       toast.error(e.message || 'Nem sikerült elindítani a szógyakorlót.');
     } finally {
@@ -318,6 +325,7 @@ function WordPracticeSetup({ data, onStart }) {
 
   const modes = [
     ['mixed', 'Vegyes', 'A leggyengébb készségedet választja: jelentés · HU→EN · helyesírás · kiejtés', true],
+    ['translation', 'Magyar → angol', 'Fix feladat: a magyar jelentésből mondd vagy írd be az angol szót', false],
     ['pronounce', 'Kiejtés', 'Hallgasd, ismételd, lassítsd vagy szótagold', false],
     ['dictation', 'Hallás utáni írás', 'Csak hallod a szót, neked kell leírni', false],
     ['missing', 'Hiányzó betűk', 'Egészítsd ki a hallott szót', false],
@@ -335,11 +343,12 @@ function WordPracticeSetup({ data, onStart }) {
 
       <section>
         <div className="text-xs font-semibold text-ink-mute mb-2">Miből gyakorolj?</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
             ['saved', 'Szavaim', `${saved.length} szó`],
             ['hard', 'Nehéz', `${hard.length} szó`],
             ['recommended', 'Ajánlott', 'Helyi válogatás · 0 token'],
+            ['fixed', 'Fix kérdések', `${FIXED_STARTER_TASKS.length} ellenőrzött feladat`],
           ].map(([id, title, sub]) => (
             <button key={id} onClick={() => setSource(id)} className={`rounded-2xl p-3 text-left ring-1 transition-all ${source === id ? 'bg-brand text-white ring-brand' : 'bg-white text-ink ring-slate-100'}`}>
               <b className="text-sm block">{title}</b><span className={`text-[10px] ${source === id ? 'text-white/70' : 'text-ink-faint'}`}>{sub}</span>
@@ -348,6 +357,18 @@ function WordPracticeSetup({ data, onStart }) {
         </div>
         {source === 'recommended' && (
           <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Téma opcionális: üzlet, utazás, IT…" className="mt-2 w-full rounded-full bg-white px-4 py-2.5 text-sm outline-none shadow-soft ring-1 ring-slate-100" />
+        )}
+        {source === 'fixed' && (
+          <div className="mt-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+            <div className="text-xs text-ink-mute">Ugyanaz a fix feladat kétféleképp jelenik meg: itt gyakorlókártyaként, Live-ban pedig a tanár kimondja és külön task cardként marad fent.</div>
+            <button
+              data-testid="fixed-task-live"
+              onClick={() => onLiveStart?.(FIXED_STARTER_TASKS[0])}
+              className="mt-3 w-full rounded-xl bg-brand-soft text-brand py-2.5 text-sm font-bold"
+            >
+              Próbáld Live-ban: „alma” → apple
+            </button>
+          </div>
         )}
       </section>
 
