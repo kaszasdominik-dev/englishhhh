@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowRight, Check, Loader2, RotateCcw, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Check, Loader2, RotateCcw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
