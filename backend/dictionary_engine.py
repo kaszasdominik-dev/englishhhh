@@ -4,51 +4,31 @@ from typing import Iterable
 LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 
 TOPIC_KEYWORDS = {
-    'business': {
-        'company','business','client','customer','supplier','invoice','contract','meeting','project','revenue','profit','expense','budget',
-        'negotiate','negotiation','proposal','deadline','colleague','manager','employee','employer','factory','production','quality','logistics',
-        'warehouse','shift','salary','payment','order','delivery','stock','sales','market','price','cost','report','email','presentation','strategy',
-        'target','task','team','office','department','career','finance','financial','account','accounting','purchase','sell','service'
-    },
-    'travel': {
-        'travel','trip','hotel','booking','reservation','airport','flight','plane','airplane','passport','luggage','suitcase','ticket','train','bus',
-        'station','taxi','map','journey','destination','beach','holiday','vacation','tour','tourist','hostel','room','check-in','departure','arrival',
-        'border','country','city','abroad','guide','museum','currency','exchange'
-    },
-    'airport': {
-        'airport','flight','plane','airplane','passport','luggage','suitcase','ticket','boarding','gate','terminal','departure','arrival','delay',
-        'security','customs','baggage','check-in','seat','aisle','window','pilot','crew','land','landing','takeoff'
-    },
-    'restaurant': {
-        'restaurant','food','meal','menu','order','waiter','waitress','bill','tip','breakfast','lunch','dinner','drink','water','coffee','tea','meat',
-        'chicken','beef','fish','vegetable','fruit','bread','soup','dessert','hungry','delicious','table','plate','fork','knife','spoon','glass',
-        'cook','chef','kitchen','taste','salt','pepper'
-    },
-    'interview': {
-        'interview','job','career','experience','skill','strength','weakness','salary','employer','employee','position','role','responsibility',
-        'achievement','team','manage','manager','leadership','resume','cv','candidate','hire','hiring','qualification','professional','workplace'
-    },
-    'everyday': {
-        'home','family','friend','work','school','shop','buy','cook','clean','sleep','wake','walk','drive','eat','drink','day','week','time','weather',
-        'morning','evening','today','tomorrow','yesterday','house','room','street','phone','money','help','need','want','like','love','go','come'
-    },
-    'car': {
-        'car','vehicle','drive','driver','road','traffic','engine','wheel','tire','tyre','brake','fuel','petrol','gasoline','diesel','parking','garage',
-        'seat','belt','speed','highway','motorway','gear','automatic','manual','repair','service','oil','battery','accident'
-    },
-    'it': {
-        'computer','software','hardware','code','program','developer','database','server','network','file','folder','login','password','website','app',
-        'application','update','bug','test','user','data','cloud','internet','email','screen','keyboard','mouse','download','upload','install','system',
-        'security','api','frontend','backend'
-    },
-    'home': {
-        'house','home','apartment','flat','room','kitchen','bathroom','bedroom','living','garden','door','window','table','chair','bed','lamp','floor',
-        'wall','roof','garage','rent','property','building','stairs','balcony','furniture','sofa','desk'
-    },
-    'shopping': {
-        'shop','store','shopping','buy','sell','price','discount','cash','card','receipt','size','clothes','shirt','shoe','jacket','dress','cheap',
-        'expensive','cost','pay','payment','customer','basket','bag','return','refund','sale','market'
-    },
+    'business': {'company','business','client','customer','supplier','invoice','contract','proposal','revenue','profit','expense','budget','negotiate','negotiation','deadline','stakeholder','commercial','enterprise','strategy','sales','market','pricing'},
+    'work': {'work','job','career','employee','employer','salary','wage','shift','colleague','supervisor','workplace','vacancy','hire','recruit','resign','overtime','payroll','task','training'},
+    'meetings': {'meeting','agenda','minutes','conference','discussion','present','presentation','briefing','participant','consensus','schedule','follow-up','seminar','workshop'},
+    'email_phone': {'email','mail','message','phone','telephone','call','voicemail','inbox','recipient','attachment','forward','reply','dial','contact','signature','extension'},
+    'interview': {'interview','candidate','resume','cv','qualification','applicant','application','recruit','hiring','experience','strength','career','vacancy','position','role'},
+    'finance': {'finance','financial','bank','money','payment','invoice','account','budget','cash','currency','interest','loan','credit','debit','tax','profit','expense','cost','fund','invest','capital','balance'},
+    'shopping': {'shop','store','shopping','buy','sell','price','discount','cash','card','receipt','size','clothes','shirt','shoe','jacket','dress','checkout','cashier','refund','sale','return','exchange'},
+    'travel': {'travel','trip','journey','tour','tourist','passport','visa','luggage','suitcase','destination','holiday','vacation','itinerary','souvenir','booking','reservation','abroad','guide'},
+    'airport': {'airport','airline','flight','plane','airplane','aircraft','boarding','runway','terminal','gate','luggage','baggage','customs','departure','arrival','pilot','security','passport'},
+    'hotel': {'hotel','motel','hostel','reception','checkout','check-in','guest','room','suite','vacancy','reservation','booking','housekeeping','towel','lobby','concierge'},
+    'restaurant': {'restaurant','food','meal','menu','order','waiter','waitress','bill','tip','breakfast','lunch','dinner','drink','chef','kitchen','dessert','starter','allergy'},
+    'transport': {'transport','train','rail','bus','tram','taxi','vehicle','car','truck','traffic','station','platform','ticket','route','driver','passenger','commute','road','subway','metro'},
+    'city_services': {'city','town','street','library','pharmacy','post','square','crossing','pavement','sidewalk','municipal','police','bank','park','neighbourhood','neighborhood'},
+    'home': {'house','home','apartment','flat','room','kitchen','bathroom','bedroom','living','garden','door','window','table','chair','bed','lamp','floor','wall','roof','garage','rent','balcony','furniture'},
+    'family': {'family','parent','mother','father','sister','brother','cousin','uncle','aunt','child','children','grandparent','nephew','niece','marriage','wedding','household'},
+    'everyday': {'daily','routine','morning','evening','weekend','habit','alarm','chore','errand','break','calendar','sleep','wake','shower','today','tomorrow','yesterday'},
+    'health': {'health','medical','medicine','doctor','nurse','hospital','clinic','symptom','disease','pain','fever','treatment','therapy','pharmacy','prescription','surgery','patient','injury'},
+    'it': {'computer','software','hardware','code','program','developer','database','server','network','file','folder','login','password','website','app','application','update','bug','test','data','cloud','internet','api','frontend','backend'},
+    'education': {'school','student','teacher','learn','lesson','course','exam','test','university','college','assignment','homework','grade','lecture','study','education','curriculum','certificate','training','classroom'},
+    'manufacturing': {'manufacturing','factory','machine','machinery','assembly','component','production','operator','weld','quality','inspection','defect','tool','metal','maintenance','tolerance','equipment','plant'},
+    'logistics': {'logistics','warehouse','shipment','shipping','delivery','deliver','pallet','forklift','barcode','inventory','dispatch','freight','cargo','stock','supply','container','loading','order'},
+    'customer_service': {'customer','service','support','complaint','refund','replacement','warranty','resolve','escalate','apologise','apologize','satisfaction','helpdesk','policy'},
+    'leisure': {'sport','game','music','film','movie','concert','hobby','book','novel','museum','theatre','theater','football','basketball','guitar','dance','festival','entertainment'},
+    'weather_environment': {'weather','rain','snow','storm','temperature','climate','environment','pollution','recycling','waste','energy','renewable','flood','drought','forest','river','ocean','nature'},
+    'communication': {'explain','clarify','repeat','meaning','opinion','reason','detail','conversation','speak','talk','say','tell','question','answer','understand'},
 }
 
 TOPIC_ALIASES = {
