@@ -137,6 +137,7 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
   const [answer, setAnswer] = useState('');
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [hintLevel, setHintLevel] = useState(0);
   const [stats, setStats] = useState({ correct: 0, wrong: 0, hard: 0 });
   const [playing, setPlaying] = useState(false);
   const [done, setDone] = useState(false);
@@ -168,6 +169,7 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
     setAnswer('');
     setLocked(false);
     setFeedback(null);
+    setHintLevel(0);
     if (!target) { setDone(true); return; }
     const id = ['meaning', 'translation'].includes(mode) ? null : setTimeout(() => speak('normal'), 220);
     return () => { if (id) clearTimeout(id); stopAudioPlayback(audioRef); };
@@ -219,8 +221,12 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
 
   const submitTyped = () => {
     if (!target || !answer.trim()) return;
-    const ok = norm(answer) === norm(target.term);
-    finishRound(ok, ok ? 'Helyes.' : `A helyes írásmód: ${target.term}`);
+    const accepted = Array.isArray(target?.learningTask?.accepted_answers) && target.learningTask.accepted_answers.length
+      ? target.learningTask.accepted_answers
+      : [target.term];
+    const expected = target?.learningTask?.expected_answer || target.term;
+    const ok = accepted.some(x => norm(answer) === norm(x));
+    finishRound(ok, ok ? 'Helyes.' : `A helyes válasz: ${expected}`);
   };
 
   const chooseMeaning = (o) => {
@@ -305,6 +311,29 @@ export function WordPracticeRoom({ pack = [], config = {}, onClose }) {
                     placeholder="Írd le angolul"
                     className="mt-5 w-full rounded-2xl bg-white/10 ring-1 ring-white/10 px-4 py-3.5 text-center text-lg font-semibold outline-none focus:ring-brand"
                   />
+                  {!locked && (
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <button
+                        data-testid="word-task-hint"
+                        onClick={() => setHintLevel(h => Math.min(2, h + 1))}
+                        className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold"
+                      >
+                        💡 Segítség
+                      </button>
+                      <button
+                        data-testid="word-task-dontknow"
+                        onClick={() => finishRound(false, `Helyes válasz: ${target?.learningTask?.expected_answer || target.term}`, 'dont_know')}
+                        className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-semibold"
+                      >
+                        Nem tudom
+                      </button>
+                    </div>
+                  )}
+                  {hintLevel > 0 && !locked && (
+                    <div className="mt-3 rounded-xl bg-amber-500/10 text-amber-200 px-3 py-2 text-sm">
+                      {target?.learningTask?.hint || `${String(target.term || '').slice(0, hintLevel)}…`}
+                    </div>
+                  )}
                 </div>
               )}
 
