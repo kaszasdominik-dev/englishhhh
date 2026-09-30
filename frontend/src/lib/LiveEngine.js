@@ -1,5 +1,6 @@
 import { API } from './api';
 import { liveKindForTask, normalizeLearningTask, taskToLiveInstruction } from './learningTasks';
+import { LANGUAGE_MIX_META, defaultLanguageMixForCefr, defaultPaceForCefr, languageModeForMix, normalizeCefr } from './liveAdaptation';
 import {
   TEACHERS, MODE_NAMES, normalizeSpeechText, cleanAssistantDisplayText,
   extractPracticeInstruction, practiceNorm, practiceNormAny, practicePhraseSimilarity,
@@ -19,7 +20,7 @@ export class LiveEngine {
     this.pc = null; this.dc = null; this.stream = null;
     this.phase = 'setup'; // setup|connecting|live|summary
     this.mode = 'business'; this.teacher = 'maya'; this.sessionMinutes = 15;
-    this.profile = {}; this.langMode = 'hu'; this.pace = 'normal';
+    this.profile = {}; this.languageMix = 'mixed'; this.langMode = null; this.pace = 'normal'; this.cefrLevel = 'B1';
     this.status = 'Készen áll'; this.connectionLabel = 'Felkészülés';
     this.connected = false; this.muted = false; this.autoPaused = false; this.timeLimitReached = false;
     this.finishing = false; this.error = null;
@@ -29,7 +30,7 @@ export class LiveEngine {
     this.practiceTarget = null; this.correction = null; this.pronunciation = null;
     this.wordCapture = null; this.wordPopover = null; this.notes = [];
     this.provisionalUser = ''; this._provRaw = ''; this._taskEvalSeq = 0;
-    this.preferenceBadge = this.langMode === 'hu' ? 'HU · magyar mód' : '';
+    this.preferenceBadge = '';
     this.understood = false;
     this.caption = { teacher: 'maya', words: [], activeIndex: -1, text: '', fallback: 'Nyomd meg az Indítás gombot. A mikrofonengedély után úgy beszélgethetsz, mint egy élő tanárral.' };
     this.summary = null; this.summaryLoading = false;
@@ -63,6 +64,7 @@ export class LiveEngine {
       practiceTarget: this.practiceTarget, correction: this.correction, pronunciation: this.pronunciation,
       wordCapture: this.wordCapture, wordPopover: this.wordPopover, notes: this.notes,
       preferenceBadge: this.preferenceBadge, understood: this.understood,
+      languageMix: this.languageMix, languageMixMeta: LANGUAGE_MIX_META[this.languageMix], cefrLevel: this.cefrLevel,
       timeLeft: this.timeLeft, summary: this.summary, summaryLoading: this.summaryLoading,
       reconnecting: this.reconnecting, reconnectFailed: this.reconnectFailed, reconnectAttempt: this.reconnectAttempt,
       diag: this.diag,
@@ -78,10 +80,17 @@ export class LiveEngine {
   }
 
   // ---------- lifecycle ----------
-  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], langMode = 'hu', initialTask = null } = {}) {
+  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], languageMix = null, langMode = null, initialTask = null } = {}) {
     this.hardCleanup(false);
     this.reset();
-    this.mode = mode; this.teacher = teacher; this.profile = profile; this.langMode = langMode; this.pendingInitialTask = initialTask ? normalizeLearningTask(initialTask) : null;
+    this.mode = mode; this.teacher = teacher; this.profile = profile;
+    this.cefrLevel = normalizeCefr(profile?.cefr || 'B1');
+    this.languageMix = ['english', 'mixed', 'hungarian'].includes(languageMix)
+      ? languageMix
+      : (langMode === 'en' ? 'english' : langMode === 'hu' ? 'hungarian' : defaultLanguageMixForCefr(this.cefrLevel));
+    this.langMode = languageModeForMix(this.languageMix);
+    this.pace = defaultPaceForCefr(this.cefrLevel);
+    this.pendingInitialTask = initialTask ? normalizeLearningTask(initialTask) : null;
     this.caption = { ...this.caption, teacher, fallback: `Nyomd meg az Indítás gombot. ${TEACHERS[teacher]?.name || 'A tanár'} azonnal köszön, aztán indul a beszélgetés.` };
     this.baselineVocab = (vocab || []).map(v => normalizeSpeechText(v.term || '').toLowerCase()).filter(Boolean);
     this.timeLeft = this.sessionMinutes * 60;
@@ -90,6 +99,23 @@ export class LiveEngine {
   }
   setMinutes(m) { this.sessionMinutes = m; this.timeLeft = m * 60; this.notify(); }
   setTeacher(t) { this.teacher = t; this.caption = { ...this.caption, teacher: t }; this.notify(); }
+
+  setLanguageMix(mix, { persist = true } = {}) {
+    if (!['english', 'mixed', 'hungarian'].includes(mix) || mix === this.languageMix) return;
+    this.languageMix = mix;
+    this.langMode = languageModeForMix(mix);
+    this.profile = { ...this.profile, liveLanguageMix: mix };
+    if (persist) this.cb.saveLivePreference?.(mix);
+    if (this.connected) {
+      const rule = mix === 'english'
+        ? 'STANDING LANGUAGE OVERRIDE: From now on, conduct the lesson entirely in English. Keep English appropriate to the learner CEFR level. If they struggle, simplify and rephrase in easier English instead of switching to Hungarian, unless they explicitly change the language control again.'
+        : mix === 'hungarian'
+          ? 'STANDING LANGUAGE OVERRIDE: From now on, use natural Hungarian for instructions, explanations, corrections and transitions. Keep English only for the exact English target words, phrases, examples and learner practice.'
+          : 'STANDING LANGUAGE OVERRIDE: From now on, use a clean bilingual teaching style: English is the main practice language, but use short natural Hungarian support when it helps understanding. Aim for roughly half English and half Hungarian at beginner levels, without mixing languages inside broken sentences. Keep the English difficulty appropriate to the learner CEFR level.';
+      this.appendInstruction(rule);
+    }
+    this.notify();
+  }
 
   async connect(isReconnect = false) {
     if (this.connected) return true;
@@ -124,7 +150,7 @@ export class LiveEngine {
       try {
         res = await fetch(`${API}/live-session`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-          body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, durationMinutes: this.sessionMinutes, languageMode: this.langMode, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
+          body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
         });
         payload = await res.json();
       } catch (fe) {
@@ -423,7 +449,13 @@ export class LiveEngine {
       exam: 'Ez Vizsga mód. Mondd, hogy ez nem hivatalos vizsga, majd adj egy könnyű feladatot.',
     };
     const nextStep = this.pendingInitialTask ? 'A fixed learning task will follow immediately after this greeting. Do NOT ask any other question yet.' : `${byMode[this.mode] || byMode.free} Keep it short: greeting plus ONE next learning question.`;
-    this.appendInstruction(`THIS IS THE FIRST RESPONSE. Your FIRST audible words MUST be exactly: "Szia, ${name}! ${t.name} vagyok." Say that greeting ONCE, no preamble. NEVER output stage directions. ${this.langMode === 'hu' ? 'All meta-speech is Hungarian; English only as the exact learning target.' : ''} ${nextStep}`);
+    const greeting = this.languageMix === 'hungarian' ? `Szia, ${name}! ${t.name} vagyok.` : `Hi, ${name}! I'm ${t.name}.`;
+    const languageRule = this.languageMix === 'english'
+      ? 'Continue in English only, adjusted to the learner level.'
+      : this.languageMix === 'hungarian'
+        ? 'Continue with Hungarian meta-speech; English only for actual learning targets and examples.'
+        : 'Continue with English as the main practice language plus short natural Hungarian support where useful.';
+    this.appendInstruction(`THIS IS THE FIRST RESPONSE. Your FIRST audible words MUST be exactly: "${greeting}" Say that greeting ONCE, no preamble. NEVER output stage directions. ${languageRule} ${nextStep}`);
     this.manualResponseInFlight = true;
     this.send({ type: 'response.create', event_id: rid('greet') });
     clearTimeout(this.greetingWatch);
@@ -934,7 +966,7 @@ export class LiveEngine {
     this.stream?.getAudioTracks().forEach(t => (t.enabled = true));
     this.send({ type: 'session.input_audio.unmute', event_id: rid('idle_resume') });
     this.ensureTutorAudible();
-    this.preferenceBadge = this.langMode === 'hu' ? 'HU · magyar mód' : '';
+    this.preferenceBadge = '';
     this.status = 'Hallgatlak…'; this.markActivity(); this.scheduleInactivityPause(); this.notify();
   }
   scheduleIdleNudge(delay = 6500) {
