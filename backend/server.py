@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dictionary_engine import recommend_dictionary_words
+from scenarios import get_scenario, list_scenarios, live_roleplay_prompt, frustration_instruction
+from question_bank import ensure_question_bank
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -290,7 +292,7 @@ def dictionary_progress_entry(state, dictionary_id, term=''):
     return item
 
 # ------------------------------------------------------------------ tutor prompt
-def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace, language_mix='mixed'):
+def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace, language_mix='mixed', scenario=None):
     t = teachers.get(teacher, teachers['maya'])
     m = modes.get(mode, modes['business'])
     raw_level = str(profile.get('cefr', 'B1') or 'B1').upper()
@@ -370,6 +372,7 @@ def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, languag
         "TASK FRAME LANGUAGE — in bilingual mode choose ONE clean frame matching the current instruction language; never splice Hungarian and English inside one frame.\n"
     )
     mem = "\n".join('- ' + x for x in memory[:18]) if memory else '- No saved learning memory yet.'
+    scenario_contract = live_roleplay_prompt(scenario) if mode == 'situation' and scenario else ''
     return f"""You are {t['name']}, a premium 1-to-1 AI English tutor inside LIVO for a Hungarian learner{(' named ' + name) if name else ''}. Your job is to teach English through a natural, human-feeling live conversation. NEVER sound like a rigid bot or classroom script.
 
 NON-NEGOTIABLE PRODUCT BOUNDARY — HIGHEST PRIORITY
@@ -392,6 +395,7 @@ SESSION TIME CONTRACT — HIGHEST PRIORITY
 - End early only when the learner clearly asks to finish.
 
 {language_contract}{level_contract}{pace_lock}{task_frame_language}
+{scenario_contract}
 MODE CONTRACT — THIS OVERRIDES GENERIC LESSON FLOW
 {modeBehaviors.get(mode, modeBehaviors['free'])}
 - Sound like a good private tutor who adapts in real time. Never moralise about tone, slang or swearing.
@@ -470,6 +474,7 @@ async def live_session(request: Request):
     if not OPENAI_API_KEY:
         return JSONResponse({"error": "OPENAI_API_KEY is not set on the server.", "code": "NO_API_KEY"}, status_code=503)
     body = await request.json()
+    scenario = get_scenario(body.get('scenarioId')) if body.get('mode') == 'situation' else None
     sdp = body.get('sdp')
     if not isinstance(sdp, str) or not sdp.strip():
         return JSONResponse({"error": "Missing SDP offer."}, status_code=400)
@@ -494,7 +499,7 @@ async def live_session(request: Request):
     session = {
         'model': LIVE_MODEL,
         'instructions': tutor_prompt(teacher, body.get('mode', 'business'), merged_profile, memory,
-                                     state.get('user', {}).get('name', ''), duration, lang, pace, language_mix),
+                                     state.get('user', {}).get('name', ''), duration, lang, pace, language_mix, scenario),
         'audio': {'output': {'voice': t['voice']}},
         'delegation': {'type': 'responses', 'responses': {
             'model': REASONING_MODEL,
@@ -517,6 +522,170 @@ async def live_session(request: Request):
     except Exception as e:
         logger.error("live-session error %s", e)
         return JSONResponse({"error": "Could not create OpenAI Live session."}, status_code=502)
+
+
+@api.get("/scenarios")
+async def scenarios_catalog():
+    return {"scenarios": list_scenarios()}
+
+@api.post("/scenario/text-turn")
+async def scenario_text_turn(request: Request):
+    body = await request.json()
+    scenario = get_scenario(body.get("scenarioId"))
+    if not scenario:
+        return JSONResponse({"error": "Ismeretlen szituáció."}, status_code=404)
+    if not OPENAI_API_KEY:
+        return JSONResponse({"error": "Az AI szituációhoz OPENAI_API_KEY szükséges.", "code": "NO_API_KEY"}, status_code=503)
+
+    steps = scenario["steps"]
+    step_index = max(0, min(len(steps) - 1, int(body.get("stepIndex") or 0)))
+    turn_count = max(0, int(body.get("turnCount") or 0))
+    if turn_count >= int(scenario.get("maxTurns", 16)):
+        return {"finished": True, "limitReached": True, "stepIndex": step_index,
+                "assistantText": "This practice is finished. Let's review how it went.",
+                "frustration": int(body.get("frustration") or 0), "mistakes": [], "newWords": []}
+
+    step = steps[step_index]
+    learner = clean_word_field(body.get("learnerText"))[:700]
+    transcript = (body.get("transcript") or [])[-10:]
+    frustration = max(0, min(3, int(body.get("frustration") or 0)))
+    schema = {"type":"object","additionalProperties":False,"properties":{
+        "assistantText":{"type":"string"},
+        "understood":{"type":"boolean"},
+        "stepComplete":{"type":"boolean"},
+        "mistakes":{"type":"array","items":{"type":"string"},"maxItems":3},
+        "newWords":{"type":"array","items":{"type":"string"},"maxItems":5}},
+        "required":["assistantText","understood","stepComplete","mistakes","newWords"]}
+
+    prompt = f"""ROLEPLAY: {scenario['title']}
+AI role: {scenario['aiRole']}
+Learner role: {scenario['userRole']}
+CURRENT STEP: {step['id']}
+GOAL: {step['goal']}
+EXPECTED MEANING: {json.dumps(step.get('expected', []))}
+FRUSTRATION STYLE: {frustration_instruction(frustration)}
+Recent transcript: {json.dumps(transcript)}
+Learner just said: {json.dumps(learner)}
+
+Return the in-character reaction for THIS STEP only.
+Rules:
+- Stay in character and on topic.
+- Do not teach or correct in the spoken assistantText when meaning is understandable.
+- stepComplete=true only when the learner has actually fulfilled the current goal.
+- understood=false only when the meaning genuinely cannot be recovered.
+- If not understood, ask ONE short in-character clarification.
+- mistakes: concise English-learning issues you can genuinely support from the learner's exact words; otherwise [].
+- newWords: useful English words/phrases that actually appeared or are directly needed in this step.
+- Do not start the next scenario step yourself."""
+    result = await openai_responses(
+        prompt,
+        "You are the controller for a finite English role-play simulation. Be strict about step completion and never invent learner errors.",
+        "livo_scenario_turn", schema, timeout=15
+    )
+    new_frustration = min(3, frustration + (0 if result.get("understood") else 1))
+    next_index = step_index + (1 if result.get("stepComplete") else 0)
+    finished = next_index >= len(steps)
+    assistant_text = clean_word_field(result.get("assistantText"))[:900]
+    if result.get("stepComplete") and not finished:
+        assistant_text = (assistant_text + " " + steps[next_index]["opening"]).strip()
+    if finished:
+        assistant_text = (assistant_text + " You're all set. This practice is finished.").strip()
+    return {
+        "assistantText": assistant_text,
+        "understood": bool(result.get("understood")),
+        "stepComplete": bool(result.get("stepComplete")),
+        "stepIndex": min(next_index, len(steps) - 1),
+        "finished": finished,
+        "frustration": new_frustration,
+        "mistakes": result.get("mistakes", [])[:3],
+        "newWords": result.get("newWords", [])[:5],
+    }
+
+@api.post("/scenario/live-check")
+async def scenario_live_check(request: Request):
+    body = await request.json()
+    scenario = get_scenario(body.get("scenarioId"))
+    if not scenario:
+        return JSONResponse({"error": "Ismeretlen szituáció."}, status_code=404)
+    if not OPENAI_API_KEY:
+        return JSONResponse({"error": "OPENAI_API_KEY is not set.", "code": "NO_API_KEY"}, status_code=503)
+    steps = scenario["steps"]
+    step_index = max(0, min(len(steps) - 1, int(body.get("stepIndex") or 0)))
+    step = steps[step_index]
+    learner = clean_word_field(body.get("learnerText"))[:700]
+    frustration = max(0, min(3, int(body.get("frustration") or 0)))
+    schema = {"type":"object","additionalProperties":False,"properties":{
+        "understood":{"type":"boolean"},"stepComplete":{"type":"boolean"},
+        "mistakes":{"type":"array","items":{"type":"string"},"maxItems":3}},
+        "required":["understood","stepComplete","mistakes"]}
+    prompt = f"""Evaluate ONE learner reply in a fixed role-play.
+Scenario: {scenario['title']}
+Current step: {step['id']}
+Goal: {step['goal']}
+Expected meaning: {json.dumps(step.get('expected', []))}
+Previous role line: {json.dumps(body.get('previousAssistant', ''))}
+Learner: {json.dumps(learner)}
+Judge meaning, not perfect grammar. A grammar mistake may still complete the step if the meaning is clear.
+Do not invent errors."""
+    result = await openai_responses(prompt, "You are a strict role-play step evaluator.", "livo_scenario_live_check", schema, timeout=12)
+    new_frustration = min(3, frustration + (0 if result.get("understood") else 1))
+    next_index = step_index + (1 if result.get("stepComplete") else 0)
+    finished = next_index >= len(steps)
+    next_step = None if finished else steps[next_index]
+    return {
+        "understood": bool(result.get("understood")),
+        "stepComplete": bool(result.get("stepComplete")),
+        "stepIndex": min(next_index, len(steps)-1),
+        "finished": finished,
+        "frustration": new_frustration,
+        "mistakes": result.get("mistakes", [])[:3],
+        "nextOpening": next_step.get("opening") if next_step else "",
+        "nextGoal": next_step.get("goal") if next_step else "",
+        "nextStepId": next_step.get("id") if next_step else "",
+        "frustrationInstruction": frustration_instruction(new_frustration),
+    }
+
+@api.post("/scenario/help")
+async def scenario_help(request: Request):
+    body = await request.json()
+    scenario = get_scenario(body.get("scenarioId"))
+    if not scenario:
+        return JSONResponse({"error": "Ismeretlen szituáció."}, status_code=404)
+    if not OPENAI_API_KEY:
+        return JSONResponse({"error": "OPENAI_API_KEY is not set.", "code": "NO_API_KEY"}, status_code=503)
+    steps = scenario["steps"]
+    step_index = max(0, min(len(steps)-1, int(body.get("stepIndex") or 0)))
+    question = clean_word_field(body.get("question"))[:700]
+    step = steps[step_index]
+    schema = {"type":"object","additionalProperties":False,"properties":{"answer":{"type":"string"}},"required":["answer"]}
+    prompt = f"""The Hungarian learner has used their ONE teacher-help question during a role-play.
+Scenario: {scenario['title']}
+Current step goal: {step['goal']}
+Current role line: {step['opening']}
+Learner question: {json.dumps(question)}
+Answer in natural Hungarian, maximum 3 short sentences. Be directly useful for this exact step.
+You may give one English example phrase. Do not start a new lesson or change topic."""
+    result = await openai_responses(prompt, "You are LIVO's one-question emergency tutor inside a role-play.", "livo_scenario_help", schema, timeout=12)
+    return {"answer": clean_word_field(result.get("answer"))[:900]}
+
+@api.get("/questions/status")
+async def question_bank_status():
+    total = await ensure_question_bank(db)
+    return {"ready": total >= 10000, "total": total, "runtimeLlmTokens": 0}
+
+@api.post("/questions/recommend")
+async def question_bank_recommend(request: Request):
+    body = await request.json()
+    await ensure_question_bank(db)
+    count = max(1, min(50, int(body.get("count") or 10)))
+    match = {"status":"active"}
+    if body.get("theme"): match["theme"] = str(body.get("theme"))
+    if body.get("cefr"): match["cefr"] = str(body.get("cefr")).upper()
+    if body.get("skill"): match["skill"] = str(body.get("skill"))
+    if body.get("subskill"): match["subskill"] = str(body.get("subskill"))
+    pipeline = [{"$match": match}, {"$sample": {"size": count}}, {"$project": {"_id": 0}}]
+    items = [x async for x in db.question_bank.aggregate(pipeline)]
+    return {"questions": items, "totalRequested": count, "runtimeLlmTokens": 0}
 
 @api.post("/word-help")
 async def word_help(request: Request):
@@ -941,6 +1110,37 @@ async def toggle_homework(request: Request):
     await save_state(state)
     return {"ok": True, "state": public_state(state)}
 
+
+@api.post("/practice-focus")
+async def save_practice_focus(request: Request):
+    body = await request.json()
+    title = clean_word_field(body.get("title"))[:120]
+    detail = clean_word_field(body.get("detail"))[:500]
+    if not title:
+        return JSONResponse({"error": "Hiányzik a gyakorlási téma."}, status_code=400)
+    state = await load_state()
+    items = state.setdefault("practiceFocus", [])
+    key = re.sub(r"\s+", " ", title.lower()).strip()
+    existing = next((x for x in items if re.sub(r"\s+", " ", str(x.get("title","")).lower()).strip() == key), None)
+    if existing:
+        existing.update({"detail": detail or existing.get("detail",""), "source": body.get("source") or existing.get("source","manual"), "updatedAt": now_iso()})
+        item = existing
+    else:
+        item = {"id": f"pf_{int(time.time()*1000)}_{random.randint(1000,9999)}", "title": title, "detail": detail,
+                "source": clean_word_field(body.get("source")) or "manual", "scenarioId": clean_word_field(body.get("scenarioId")),
+                "createdAt": now_iso(), "done": False}
+        items.insert(0, item)
+    state["practiceFocus"] = items[:40]
+    await save_state(state)
+    return {"ok": True, "item": item, "state": public_state(state)}
+
+@api.delete("/practice-focus/{focus_id}")
+async def delete_practice_focus(focus_id: str):
+    state = await load_state()
+    state["practiceFocus"] = [x for x in state.get("practiceFocus", []) if x.get("id") != focus_id]
+    await save_state(state)
+    return {"ok": True, "state": public_state(state)}
+
 @api.delete("/privacy/reset")
 async def reset_learning():
     seed = json.loads((ROOT_DIR / 'seed_state.json').read_text(encoding='utf-8'))
@@ -994,6 +1194,7 @@ async def analyze_session(request: Request):
 Vocabulary that ALREADY existed before this session (EXCLUDE from vocabulary output): {json.dumps(list(baseline))}
 Existing grammar patterns: {json.dumps(state.get('grammar', []))}
 Session mode: {body.get('mode', 'business')}
+Scenario id: {body.get('scenarioId') or ''}
 Duration seconds: {duration}
 Transcript JSON: {json.dumps(transcript)}
 Analyse ONLY this session. Preserve the learner exact wording in correction.original. Do not invent errors. Hungarian explanations preferred. For vocabulary: ONLY genuinely useful English words/phrases that appear in THIS transcript and were NOT in the baseline. Update mastery cautiously (delta -6..+8). Homework 3\u201310 minutes based on this session."""
@@ -1031,6 +1232,7 @@ Analyse ONLY this session. Preserve the learner exact wording in correction.orig
                 g['count'] = g.get('count', 0) + 1
     session = {"id": f"s_{int(time.time()*1000)}", "createdAt": now_iso(), "mode": body.get('mode', 'business'),
                "teacher": body.get('teacher') or state.get('profile', {}).get('teacher'), "durationSeconds": duration,
+               "scenarioId": body.get('scenarioId') or '',
                "transcript": transcript, "summary": result}
     state.setdefault('sessions', []).insert(0, session)
     state['sessions'] = state['sessions'][:40]
