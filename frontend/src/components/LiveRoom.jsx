@@ -244,8 +244,9 @@ function LanguageMixControl({ s, engine, open, setOpen }) {
     <div className="relative">
       <button
         data-testid="live-language-mix"
-        onClick={() => setOpen(v => !v)}
-        className="inline-flex items-center gap-1 rounded-full bg-white/[0.08] ring-1 ring-white/10 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-200 active:scale-95 transition-transform"
+        onClick={() => s.phase !== 'connecting' && setOpen(v => !v)}
+        disabled={s.phase === 'connecting'}
+        className="inline-flex items-center gap-1 rounded-full bg-white/[0.08] ring-1 ring-white/10 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-200 active:scale-95 transition-transform disabled:opacity-40"
         aria-label="Beszéd nyelve"
         aria-expanded={open}
       >
