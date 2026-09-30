@@ -50,7 +50,7 @@ export class LiveEngine {
     this.pendingInitialTask = null;
     this.scenario = null;
     this.situationStepIndex = 0; this.situationHintsUsed = 0; this.situationHintText = '';
-    this.situationHelpUsed = 0; this.situationHelpArmed = false;
+    this.situationHelpUsed = 0; this.situationHelpArmed = false; this.situationClearHelpAfterResponse = false;
     this.situationFrustration = 0; this.situationTurnCount = 0; this.situationFinished = false;
     this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false; this.situationFinishAfterResponse = false;
     this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null;
@@ -399,6 +399,10 @@ export class LiveEngine {
         const finishedGreeting = this.greetingPhase === 'pending' || this.greetingPhase === 'speaking';
         if (finishedGreeting) { this.greetingPhase = 'done'; this.greetingRequested = true; }
         if (last) { this.updatePracticeFromAssistant(last); this.detectMisunderstanding(last.text); this.maybePronunciationFeedback(last.text); }
+        if (this.mode === 'situation' && this.scenario && this.situationClearHelpAfterResponse) {
+          this.situationClearHelpAfterResponse = false;
+          this.appendInstruction(`HELP MODE OVER. Return fully to role as ${this.scenario.aiRole}. Remain on step ${this.currentSituationStep()?.id || ''} until the scenario controller advances it.`);
+        }
         if (this.mode === 'situation' && this.scenario && this.situationFinishAfterResponse) {
           this.situationFinishAfterResponse = false;
           setTimeout(() => { if (!this.finishing) this.finish(); }, 450);
