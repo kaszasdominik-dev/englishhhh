@@ -1,7 +1,7 @@
 import React, { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
-import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb, Languages } from 'lucide-react';
+import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb, Languages, HelpCircle } from 'lucide-react';
 
 // Fire immediately on press (pointerdown). Bulletproof during the live karaoke, where the caption
 // re-renders many times per second and a pointerup/click can be LOST when the pressed word node is
@@ -77,6 +77,27 @@ export function LiveRoom({ engine }) {
 
           {/* Scrollable caption + task area */}
           <div className="flex-1 overflow-y-auto livo-scroll px-5 pb-2">
+            {s.mode === 'situation' && s.scenario && (
+              <div data-testid="situation-live-controls" className="mb-3 rounded-2xl bg-white/[0.06] ring-1 ring-white/10 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[10px] tracking-widest font-bold text-brand-ring">SZITUÁCIÓ · {s.situationStepIndex + 1}/{s.scenario.steps?.length || 1}</div>
+                    <b className="text-sm text-white truncate block">{s.scenario.title}</b>
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">feszültség {s.situationFrustration || 0}/3</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button data-testid="situation-hint" onClick={() => engine.situationHint()} disabled={s.situationFinished || s.situationHintsUsed >= (s.scenario.hintLimit || 3)} className="flex-1 rounded-xl bg-amber-400/15 text-amber-200 py-2 text-xs font-bold disabled:opacity-35 inline-flex items-center justify-center gap-1.5">
+                    <Lightbulb size={13} /> Tipp {(s.scenario.hintLimit || 3) - (s.situationHintsUsed || 0)}
+                  </button>
+                  <button data-testid="situation-help" onClick={() => engine.situationAskHelp()} disabled={s.situationFinished || s.situationHelpUsed >= (s.scenario.helpLimit || 1) || s.situationHelpArmed} className="flex-1 rounded-xl bg-white/10 text-slate-200 py-2 text-xs font-bold disabled:opacity-35 inline-flex items-center justify-center gap-1.5">
+                    <HelpCircle size={13} /> AI kérdés {(s.scenario.helpLimit || 1) - (s.situationHelpUsed || 0)}
+                  </button>
+                </div>
+                {s.situationHintText && <div className="mt-2 rounded-xl bg-amber-400/10 px-3 py-2 text-xs text-amber-100">💡 {s.situationHintText}</div>}
+                {s.situationHelpArmed && <div className="mt-2 text-[11px] text-brand-ring">Most tedd fel az egyetlen kérdésedet szóban.</div>}
+              </div>
+            )}
             {/* Caption */}
             <div className={`rounded-[1.5rem] bg-white/[0.06] ring-1 ring-white/10 p-5 backdrop-blur transition-[opacity,transform] duration-500 ${s.practiceTarget?.text && !s.practiceTarget.completed ? 'opacity-35 scale-[0.97]' : ''}`}>
               <div className="flex items-center gap-2 mb-2.5">
@@ -452,7 +473,7 @@ function SummaryModal({ s, engine }) {
   const corrections = (a.corrections || []).slice(0, 5);
   const vocab = (a.vocabulary || []).slice(0, 8);
   const homework = (a.homework || []).slice(0, 2);
-  const { saveVocab } = engine.cb;
+  const { saveVocab, savePracticeFocus } = engine.cb;
   return (
     <div className="absolute inset-0 z-40 flex items-end" data-testid="summary-modal">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => engine.dismissSummary()} />
@@ -462,6 +483,16 @@ function SummaryModal({ s, engine }) {
           <div className="flex items-center justify-between"><span className="text-[11px] tracking-widest font-bold text-task-accent">ÓRA LEZÁRVA</span><span className="h-6 w-6 rounded-full bg-emerald-500 grid place-items-center"><Check size={14} /></span></div>
           <h2 className="font-heading font-extrabold text-2xl mt-2">{a.headline || 'Kész az óra.'}</h2>
           <p className="text-sm text-slate-300 mt-1">{a.next_focus || 'Innen folytatjuk legközelebb.'}</p>
+          {(a.next_focus || a.scenarioTitle) && (
+            <button data-testid="summary-save-focus" onClick={() => savePracticeFocus?.({
+              title: a.next_focus || ((a.scenarioTitle || 'Szituáció') + ' gyakorlása'),
+              detail: a.scenarioTitle ? ('Szituáció: ' + a.scenarioTitle) : 'Live óra alapján',
+              source: a.scenarioId ? 'situation_summary' : 'live_summary',
+              scenarioId: a.scenarioId || '',
+            })} className="mt-3 rounded-full bg-white/10 text-white px-3 py-2 text-xs font-bold inline-flex items-center gap-1.5">
+              <Bookmark size={13} /> Mentés a gyakorlandók közé
+            </button>
+          )}
           <div className="grid grid-cols-3 gap-2 mt-4">
             <Stat b={Math.max(0, Number(a.speaking_minutes || 0))} l="aktív perc" />
             <Stat b={corrections.length} l="javítás" />
