@@ -48,6 +48,11 @@ export class LiveEngine {
     this._practiceAnswerSeq = 0;
     this.pendingPron = null; this.pronTimer = null;
     this.pendingInitialTask = null;
+    this.scenario = null;
+    this.situationStepIndex = 0; this.situationHintsUsed = 0; this.situationHintText = '';
+    this.situationHelpUsed = 0; this.situationHelpArmed = false;
+    this.situationFrustration = 0; this.situationTurnCount = 0; this.situationFinished = false;
+    this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false;
     this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null;
     this.diag = [];
   }
@@ -68,6 +73,11 @@ export class LiveEngine {
       timeLeft: this.timeLeft, summary: this.summary, summaryLoading: this.summaryLoading,
       reconnecting: this.reconnecting, reconnectFailed: this.reconnectFailed, reconnectAttempt: this.reconnectAttempt,
       diag: this.diag,
+      scenario: this.scenario, situationStepIndex: this.situationStepIndex,
+      situationHintsUsed: this.situationHintsUsed, situationHintText: this.situationHintText,
+      situationHelpUsed: this.situationHelpUsed, situationHelpArmed: this.situationHelpArmed,
+      situationFrustration: this.situationFrustration, situationTurnCount: this.situationTurnCount,
+      situationFinished: this.situationFinished, situationMistakes: this.situationMistakes,
       modeLabel: MODE_NAMES[this.mode] || 'Angol gyakorlás',
     };
   }
@@ -80,10 +90,10 @@ export class LiveEngine {
   }
 
   // ---------- lifecycle ----------
-  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], languageMix = null, langMode = null, initialTask = null } = {}) {
+  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], languageMix = null, langMode = null, initialTask = null, scenario = null } = {}) {
     this.hardCleanup(false);
     this.reset();
-    this.mode = mode; this.teacher = teacher; this.profile = profile;
+    this.mode = mode; this.teacher = teacher; this.profile = profile; this.scenario = scenario || null;
     this.cefrLevel = normalizeCefr(profile?.cefr || 'B1');
     this.languageMix = ['english', 'mixed', 'hungarian'].includes(languageMix)
       ? languageMix
@@ -91,7 +101,7 @@ export class LiveEngine {
     this.langMode = languageModeForMix(this.languageMix);
     this.pace = defaultPaceForCefr(this.cefrLevel);
     this.pendingInitialTask = initialTask ? normalizeLearningTask(initialTask) : null;
-    this.caption = { ...this.caption, teacher, fallback: `Nyomd meg az Indítás gombot. ${TEACHERS[teacher]?.name || 'A tanár'} azonnal köszön, aztán indul a beszélgetés.` };
+    this.caption = { ...this.caption, teacher, fallback: this.scenario ? `Nyomd meg az Indítás gombot. Indul: ${this.scenario.title}.` : `Nyomd meg az Indítás gombot. ${TEACHERS[teacher]?.name || 'A tanár'} azonnal köszön, aztán indul a beszélgetés.` };
     this.baselineVocab = (vocab || []).map(v => normalizeSpeechText(v.term || '').toLowerCase()).filter(Boolean);
     this.timeLeft = this.sessionMinutes * 60;
     this.phase = 'setup';
@@ -150,7 +160,7 @@ export class LiveEngine {
       try {
         res = await fetch(`${API}/live-session`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-          body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
+          body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, scenarioId: this.scenario?.id || null, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
         });
         payload = await res.json();
       } catch (fe) {
@@ -389,6 +399,13 @@ export class LiveEngine {
         const finishedGreeting = this.greetingPhase === 'pending' || this.greetingPhase === 'speaking';
         if (finishedGreeting) { this.greetingPhase = 'done'; this.greetingRequested = true; }
         if (last) { this.updatePracticeFromAssistant(last); this.detectMisunderstanding(last.text); this.maybePronunciationFeedback(last.text); }
+        if (this.mode === 'situation' && this.scenario && this.situationPendingOpening) {
+          const opening = this.situationPendingOpening; this.situationPendingOpening = '';
+          setTimeout(() => this.oneShot(`SCENARIO NEXT STEP. Say exactly: "${opening}". Stay in role. Ask nothing else and wait for the learner.`), 180);
+        } else if (this.mode === 'situation' && this.scenario && this.situationFinishQueued) {
+          this.situationFinishQueued = false;
+          setTimeout(() => { if (!this.finishing) this.finish(); }, 500);
+        }
         if (finishedGreeting && this.pendingInitialTask) {
           const task = this.pendingInitialTask; this.pendingInitialTask = null;
           setTimeout(() => this.presentLearningTask(task, { speak: true }), 250);
@@ -435,6 +452,20 @@ export class LiveEngine {
   requestGreeting() {
     if (this.greetingRequested || this.dc?.readyState !== 'open' || this.greetingPhase === 'done') return;
     this.greetingRequested = true; this.greetingPhase = 'pending';
+    if (this.mode === 'situation' && this.scenario) {
+      const opening = this.scenario.steps?.[0]?.opening || 'Hello.';
+      this.status = this.scenario.title + ' indul…'; this.notify();
+      this.appendInstruction(`ROLEPLAY START. Your first audible line MUST be exactly: "${opening}". Do not introduce yourself as a teacher. Stay in character as ${this.scenario.aiRole}. Ask only this one current-step question and wait.`);
+      this.manualResponseInFlight = true;
+      this.send({ type: 'response.create', event_id: rid('scenario_start') });
+      clearTimeout(this.greetingWatch);
+      this.greetingWatch = setTimeout(() => {
+        if (this.connected && this.greetingPhase !== 'done' && !this.assistantSpeaking && !this.manualResponseInFlight && this.greetingRetries < 1) {
+          this.greetingRetries++; this.greetingRequested = false; this.greetingPhase = 'idle'; this.requestGreeting();
+        }
+      }, 7000);
+      return;
+    }
     const t = TEACHERS[this.teacher] || TEACHERS.james;
     this.status = `${t.name} köszön…`; this.notify();
     const name = this.profile?.name || 'Dominik';
@@ -808,6 +839,7 @@ export class LiveEngine {
     const turn = this.latestUserTurn(); if (!turn || this.finishing || seq !== this.turnCheckSeq) return;
     if (turn.id === this.lastCheckedTurnId) return;
     const text = normalizeSpeechText(turn.text); if (!text) return;
+    if (this.mode === 'situation' && this.scenario) return this.verifySituationTurn(seq, turn, text);
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
@@ -817,6 +849,89 @@ export class LiveEngine {
       if (r?.shouldCorrect && Number(r.confidence) >= 0.9 && r.corrected && r.original) this.showCorrection(`${r.original} → ${r.corrected}`, r.reason || 'Pontos javítás.');
       if (r?.uncertain) { this.understood = true; this.notify(); setTimeout(() => { this.understood = false; this.notify(); }, 5200); }
     } catch { /* ignore */ } finally { if (this.turnCheckAbort === ctrl) this.turnCheckAbort = null; }
+  }
+
+  // ---------- finite situation role-play ----------
+  currentSituationStep() { return this.scenario?.steps?.[this.situationStepIndex] || null; }
+
+  situationHint() {
+    const step = this.currentSituationStep();
+    if (!step || this.situationFinished || this.situationHintsUsed >= (this.scenario?.hintLimit || 3)) return;
+    const hints = step.hints || [];
+    const hint = hints[Math.min(this.situationHintsUsed, hints.length - 1)] || '';
+    this.situationHintsUsed += 1;
+    this.situationHintText = hint;
+    this.notify();
+  }
+
+  situationAskHelp() {
+    if (!this.scenario || this.situationFinished || this.situationHelpUsed >= (this.scenario.helpLimit || 1) || this.situationHelpArmed) return;
+    this.situationHelpUsed = 1; this.situationHelpArmed = true;
+    this.notify();
+    this.oneShot('Temporarily enter HELP MODE. Say exactly in Hungarian: "Segítek, viszont csak 1 kérdésed lehet! Hallgatlak." Then STOP and wait. Do not answer anything yet and do not advance the scenario.');
+  }
+
+  async verifySituationTurn(seq, turn, text) {
+    if (!this.scenario || !turn || seq !== this.turnCheckSeq || this.situationFinished) return;
+    const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
+    this.lastCheckedTurnId = turn.id;
+    const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
+    try {
+      if (this.situationHelpArmed) {
+        const r = await fetch(`${API}/scenario/help`, {
+          method:'POST', signal:ctrl.signal, headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ scenarioId:this.scenario.id, stepIndex:this.situationStepIndex, question:text }),
+        }).then(x=>x.json());
+        if (seq !== this.turnCheckSeq) return;
+        this.situationHelpArmed = false;
+        const opening = this.currentSituationStep()?.opening || '';
+        this.appendInstruction(`HELP MODE IS NOW OVER. Return immediately to role as ${this.scenario.aiRole}. Stay on scenario step ${this.currentSituationStep()?.id || ''}.`);
+        this.oneShot(`Briefly answer the learner's one help question in Hungarian using this approved help: ${JSON.stringify(r.answer || '')}. Then say in English: ${JSON.stringify(opening)}. Do not add another teaching explanation.`);
+        this.notify();
+        return;
+      }
+
+      const r = await fetch(`${API}/scenario/live-check`, {
+        method:'POST', signal:ctrl.signal, headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          scenarioId:this.scenario.id, stepIndex:this.situationStepIndex, learnerText:text,
+          previousAssistant:prev, frustration:this.situationFrustration,
+        }),
+      }).then(x=>x.json());
+      if (seq !== this.turnCheckSeq) return;
+
+      this.situationTurnCount += 1;
+      this.situationFrustration = Number(r.frustration || 0);
+      if (Array.isArray(r.mistakes) && r.mistakes.length) this.situationMistakes = [...new Set([...this.situationMistakes, ...r.mistakes])].slice(0, 12);
+
+      if (!r.understood) {
+        this.understood = true;
+        this.appendInstruction(`SCENARIO FRUSTRATION UPDATE: ${r.frustrationInstruction || ''} Stay on the current step. Ask only one short in-character clarification.`);
+        setTimeout(() => { this.understood = false; this.notify(); }, 5200);
+      }
+
+      if (r.stepComplete) {
+        this.situationStepIndex = Number(r.stepIndex ?? this.situationStepIndex);
+        this.situationHintText = '';
+        if (r.finished) {
+          this.situationFinished = true;
+          this.appendInstruction('SCENARIO COMPLETE. Do not ask any new question or change topic. Close the role-play naturally in ONE short in-character sentence, then remain silent.');
+          this.situationFinishQueued = true;
+        } else {
+          this.appendInstruction(`SCENARIO STEP UPDATE — HIGHEST PRIORITY. Current step is now ${r.nextStepId}. Goal: ${r.nextGoal}. Stay strictly on this step until another update.`);
+          this.situationPendingOpening = r.nextOpening || '';
+        }
+      }
+
+      if (this.situationTurnCount >= (this.scenario.maxTurns || 16) && !this.situationFinished) {
+        this.situationFinished = true;
+        this.situationPendingOpening = '';
+        this.appendInstruction('SCENARIO TURN LIMIT REACHED. Close the role-play in ONE short in-character sentence. Do not continue the conversation.');
+        this.situationFinishQueued = true;
+      }
+      this.notify();
+    } catch { /* keep live role-play running */ }
+    finally { if (this.turnCheckAbort === ctrl) this.turnCheckAbort = null; }
   }
 
   // ---------- pronunciation ----------
@@ -1048,17 +1163,17 @@ export class LiveEngine {
     this.summary = {
       headline: 'Kész — az óra lezárult.', speaking_minutes: Math.max(1, Math.round((this.usageSeconds || duration) / 60)),
       user_turns: userTurns.length, wins: [], corrections: [], vocabulary: [], next_focus: 'A részletes értékelés készül…',
-      homework: [], last_exchange: transcript.slice(-4), teacher, mode, instant: true,
+      homework: [], last_exchange: transcript.slice(-4), teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: true,
     };
     this.summaryLoading = true; this.phase = 'summary';
     this.hardCleanup(true);
     this.notify();
     const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 14000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher, mode, durationSeconds: duration, transcript, baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
-      this.summary = { ...r.analysis, teacher, mode, instant: false }; this.summaryLoading = false; this.notify();
+      this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
     } catch (e) {
       if (seq !== this.summarySeq) return;
       this.summary = { ...this.summary, next_focus: 'A részletes AI-elemzés most nem érkezett meg. A következő órán innen folytatjuk.', instant: false }; this.summaryLoading = false; this.notify();
