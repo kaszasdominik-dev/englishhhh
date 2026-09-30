@@ -851,6 +851,25 @@ export class LiveEngine {
   }
 
   // ---------- finite situation role-play ----------
+  flushSituationQueue() {
+    if (!this.scenario || this.finishing || this.assistantSpeaking || this.manualResponseInFlight || this.userSpeaking || this.serverSpeechActive) return false;
+    if (this.situationPendingOpening) {
+      const opening = this.situationPendingOpening;
+      const ok = this.oneShot(`SCENARIO NEXT STEP. Say exactly: "${opening}". Stay in role. Ask nothing else and wait for the learner.`);
+      if (ok) this.situationPendingOpening = '';
+      return ok;
+    }
+    if (this.situationFinishQueued) {
+      const ok = this.oneShot('SCENARIO COMPLETE. Close the role-play naturally in ONE short in-character sentence. Do not ask a new question and do not change topic.');
+      if (ok) {
+        this.situationFinishQueued = false;
+        this.situationFinishAfterResponse = true;
+      }
+      return ok;
+    }
+    return false;
+  }
+
   currentSituationStep() { return this.scenario?.steps?.[this.situationStepIndex] || null; }
 
   situationHint() {
