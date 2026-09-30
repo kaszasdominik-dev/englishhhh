@@ -52,7 +52,7 @@ export class LiveEngine {
     this.situationStepIndex = 0; this.situationHintsUsed = 0; this.situationHintText = '';
     this.situationHelpUsed = 0; this.situationHelpArmed = false;
     this.situationFrustration = 0; this.situationTurnCount = 0; this.situationFinished = false;
-    this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false;
+    this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false; this.situationFinishAfterResponse = false;
     this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null;
     this.diag = [];
   }
@@ -399,12 +399,11 @@ export class LiveEngine {
         const finishedGreeting = this.greetingPhase === 'pending' || this.greetingPhase === 'speaking';
         if (finishedGreeting) { this.greetingPhase = 'done'; this.greetingRequested = true; }
         if (last) { this.updatePracticeFromAssistant(last); this.detectMisunderstanding(last.text); this.maybePronunciationFeedback(last.text); }
-        if (this.mode === 'situation' && this.scenario && this.situationPendingOpening) {
-          const opening = this.situationPendingOpening; this.situationPendingOpening = '';
-          setTimeout(() => this.oneShot(`SCENARIO NEXT STEP. Say exactly: "${opening}". Stay in role. Ask nothing else and wait for the learner.`), 180);
-        } else if (this.mode === 'situation' && this.scenario && this.situationFinishQueued) {
-          this.situationFinishQueued = false;
-          setTimeout(() => { if (!this.finishing) this.finish(); }, 500);
+        if (this.mode === 'situation' && this.scenario && this.situationFinishAfterResponse) {
+          this.situationFinishAfterResponse = false;
+          setTimeout(() => { if (!this.finishing) this.finish(); }, 450);
+        } else if (this.mode === 'situation' && this.scenario) {
+          setTimeout(() => this.flushSituationQueue(), 120);
         }
         if (finishedGreeting && this.pendingInitialTask) {
           const task = this.pendingInitialTask; this.pendingInitialTask = null;
@@ -930,6 +929,7 @@ export class LiveEngine {
         this.situationFinishQueued = true;
       }
       this.notify();
+      setTimeout(() => this.flushSituationQueue(), 80);
     } catch { /* keep live role-play running */ }
     finally { if (this.turnCheckAbort === ctrl) this.turnCheckAbort = null; }
   }
@@ -1095,6 +1095,14 @@ export class LiveEngine {
     if (!this.connected || this.muted || this.finishing || this.greetingPhase !== 'done' || this.assistantSpeaking || this.manualResponseInFlight || this.userSpeaking || this.serverSpeechActive || this.timeLimitReached) return;
     if (!this.lastByRole.assistant || this.idleGuideCount >= 2) return;
     const pass = ++this.idleGuideCount;
+    if (this.mode === 'situation' && this.scenario) {
+      const step = this.currentSituationStep();
+      const instr = pass === 1
+        ? `The learner is silent in the role-play. Stay strictly in character as ${this.scenario.aiRole}. Rephrase the CURRENT step question once, slightly more simply. Do not teach, hint, change topic or advance the step. Current goal: ${step?.goal || ''}.`
+        : `The learner is still silent. Stay in role and repeat the CURRENT step request one final time, briefly. Do not reveal the answer and do not advance.`;
+      if (!this.oneShot(instr)) this.idleGuideCount = Math.max(0, this.idleGuideCount - 1);
+      return;
+    }
     const target = this.practiceTarget?.text || ''; const completed = this.practiceTarget?.completed === true;
     const instr = pass === 1
       ? `The learner has been silent for several seconds. YOU must lead now; do not merely say "Na?". Take the next teaching step. ${target ? `The visible target is ${JSON.stringify(target)} and it is ${completed ? 'already completed' : 'still pending'}. ` : ''}Give one tiny hint or scaffold, then ask one concrete short question. 1–3 sentences in the current persona and language mode.`
