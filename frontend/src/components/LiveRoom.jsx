@@ -237,7 +237,15 @@ function TaskCard({ s, engine }) {
         const englishTarget = isTranslate ? (pt.correctAnswer || pt.answer || '') : pt.text;
         const revealedAnswer = isMeaning ? (pt.correctAnswer || pt.answer || '') : englishTarget;
         const canPronounce = !!englishTarget && (!isTranslate || revealed || st === 'correct');
-        const taskLabel = isTranslate ? 'MONDD KI ANGOLUL' : isMeaning ? 'MONDD EL, MIT JELENT' : 'MONDD KI';
+        const taskLabel = ({
+          translate_to_english: 'MONDD KI ANGOLUL',
+          vocabulary_recall: 'MONDD KI ANGOLUL',
+          translate_to_hungarian: 'MONDD MAGYARUL',
+          repeat_after_me: 'ISMÉTELD UTÁNAM',
+          free_answer: 'VÁLASZOLJ ANGOLUL',
+          read_aloud: 'OLVASD FEL',
+          pronunciation: 'MONDD KI HELYESEN',
+        })[pt.taskType] || (isTranslate ? 'MONDD KI ANGOLUL' : isMeaning ? 'MONDD EL, MIT JELENT' : 'MONDD KI');
         const tone = st === 'correct' ? 'bg-emerald-500/15 ring-2 ring-emerald-400/60'
           : st === 'almost_correct' ? 'bg-amber-500/15 ring-2 ring-amber-400/60'
           : st === 'wrong' ? 'bg-rose-500/12 ring-2 ring-rose-400/50'
