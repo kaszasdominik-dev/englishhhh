@@ -63,6 +63,26 @@ export function StoreProvider({ children }) {
     try { const r = await api('/homework', { method: 'POST', body: JSON.stringify({ id, done }) }); setData(r.state); } catch { /* ignore */ }
   }, []);
 
+  const savePracticeFocus = useCallback(async (payload) => {
+    try {
+      const r = await api('/practice-focus', { method: 'POST', body: JSON.stringify(payload || {}) });
+      setData(r.state);
+      toast.success('Elmentve a gyakorlandók közé.');
+      return r.item;
+    } catch (e) {
+      toast.error(e.message || 'Nem sikerült elmenteni a gyakorlási témát.');
+      return null;
+    }
+  }, []);
+
+  const deletePracticeFocus = useCallback(async (id) => {
+    try {
+      const r = await api(`/practice-focus/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      setData(r.state);
+      toast.success('Törölve a gyakorlandók közül.');
+    } catch { toast.error('Nem sikerült törölni.'); }
+  }, []);
+
   const resetLearning = useCallback(async () => {
     try { const r = await api('/privacy/reset', { method: 'DELETE' }); setData(r.state); toast.success('Tanulási adatok törölve.'); } catch { toast.error('Nem sikerült törölni.'); }
   }, []);
@@ -90,6 +110,6 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  const value = { data, setData, ready, error, saveProfile, saveVocabulary, deleteVocabulary, toggleHomework, resetLearning, previewTeacher };
+  const value = { data, setData, ready, error, saveProfile, saveVocabulary, deleteVocabulary, toggleHomework, savePracticeFocus, deletePracticeFocus, resetLearning, previewTeacher };
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

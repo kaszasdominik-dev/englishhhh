@@ -4,11 +4,12 @@ import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
 import { TEACHERS, MODES, MODE_NAMES, pct, computeStreak, normalizeSpeechText } from '@/lib/livo';
 import { FIXED_STARTER_TASKS } from '@/lib/learningTasks';
+import QuestionPracticeRoom from '@/components/QuestionPracticeRoom';
 import { toast } from 'sonner';
 import {
   ArrowRight, Briefcase, MessagesSquare, Sparkles, Wand2, UserRoundCheck, Clapperboard,
   AudioLines, GraduationCap, Search, Plus, Trash2, Star, Check, Flame, Clock, Trophy, RefreshCw, Loader2,
-  History, ChevronRight, X,
+  History, ChevronRight, X, Bookmark,
 } from 'lucide-react';
 
 const ICONS = { Briefcase, MessagesSquare, Sparkles, Wand2, UserRoundCheck, Clapperboard, AudioLines, GraduationCap };
@@ -160,7 +161,7 @@ function FocusCard({ onClick, icon: Icon, title, sub, tag }) {
   );
 }
 
-export function PracticeView({ data, openLive, onTeacher }) {
+export function PracticeView({ data, openLive, onTeacher, onSituation }) {
   const t = TEACHERS[data.profile.teacher] || TEACHERS.james;
   const [langMode, setLangMode] = useState(() => localStorage.getItem('livo_live_language') || 'hu');
   const setLanguage = (value) => { setLangMode(value); localStorage.setItem('livo_live_language', value); };
@@ -188,7 +189,7 @@ export function PracticeView({ data, openLive, onTeacher }) {
           const Icon = ICONS[m.icon] || Sparkles;
           const featured = m.tag === 'AJÁNLOTT';
           return (
-            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => openLive(m.id, { langMode })}
+            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => m.id === 'situation' ? onSituation?.() : openLive(m.id, { langMode })}
               className={`relative overflow-hidden text-left rounded-[1.35rem] p-5 active:scale-[.98] transition-transform ${featured ? 'bg-task-bg text-task-text shadow-card' : 'bg-white text-ink shadow-soft ring-1 ring-slate-100'}`}>
               {featured && <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand/40 blur-2xl" />}
               <div className="relative flex items-start gap-3">
@@ -212,8 +213,8 @@ export function PracticeView({ data, openLive, onTeacher }) {
 }
 
 /* ------------------------------------------------------------ Learn */
-const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['homework', 'Házi']];
-const TOPICS = ['', 'Üzlet', 'Nyaralás', 'Interjú', 'Repülőtér', 'Étterem', 'Hétköznapok', 'Autózás'];
+const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['sentences', 'Mondatok'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['focus', 'Gyakorlandó'], ['homework', 'Házi']];
+const TOPICS = ['', 'Üzlet', 'Munka', 'Meeting', 'E-mail', 'Pénzügy', 'Állásinterjú', 'Utazás', 'Repülőtér', 'Szálloda', 'Étterem', 'Vásárlás', 'Közlekedés', 'Egészség', 'Technológia', 'Oktatás', 'Gyártás', 'Logisztika', 'Ügyfélszolgálat', 'Hétköznapok', 'Otthon'];
 
 export function LearnView({ onPlay, onWordPractice, openLive }) {
   const { data } = useStore();
@@ -227,8 +228,10 @@ export function LearnView({ onPlay, onWordPractice, openLive }) {
       </div>
       {tab === 'words' && <WordBank data={data} />}
       {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} onLiveStart={(task) => openLive?.('vocabulary', { initialTask: task })} />}
+      {tab === 'sentences' && <QuestionPracticeRoom defaultLevel={data.profile?.cefr || 'B1'} />}
       {tab === 'lab' && <WordLab data={data} onPlay={onPlay} />}
       {tab === 'grammar' && <GrammarPane data={data} />}
+      {tab === 'focus' && <PracticeFocusPane data={data} />}
       {tab === 'homework' && <HomeworkPane data={data} />}
     </div>
   );
@@ -493,6 +496,33 @@ function GrammarPane({ data }) {
           <p className="text-sm text-rose2 line-through mt-2">{g.original}</p>
           <p className="text-sm text-emerald2 font-semibold">{g.corrected}</p>
           <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${g.mastery}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PracticeFocusPane({ data }) {
+  const { deletePracticeFocus } = useStore();
+  const items = data.practiceFocus || [];
+  return (
+    <div className="space-y-3">
+      {items.length === 0 && (
+        <div className="rounded-2xl bg-white p-6 text-center shadow-soft ring-1 ring-slate-100">
+          <Bookmark size={22} className="mx-auto text-brand" />
+          <b className="block text-sm text-ink mt-2">Még nincs mentett gyakorlási fókusz.</b>
+          <p className="text-xs text-ink-mute mt-1">Szituációk és óraértékelések végén egy koppintással ide mentheted, amit újra gyakorolnál.</p>
+        </div>
+      )}
+      {items.map(item => (
+        <div key={item.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-100 flex items-start gap-3">
+          <span className="h-9 w-9 rounded-xl bg-brand-soft text-brand grid place-items-center shrink-0"><Bookmark size={16} /></span>
+          <div className="flex-1 min-w-0">
+            <b className="text-sm text-ink block">{item.title}</b>
+            {item.detail && <p className="text-xs text-ink-mute mt-1">{item.detail}</p>}
+            {item.scenarioId && <span className="inline-block mt-2 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-bold text-ink-faint">{item.scenarioId}</span>}
+          </div>
+          <button onClick={() => deletePracticeFocus(item.id)} className="h-8 w-8 rounded-full grid place-items-center text-ink-faint hover:text-rose2 hover:bg-rose2-bg"><Trash2 size={14} /></button>
         </div>
       ))}
     </div>

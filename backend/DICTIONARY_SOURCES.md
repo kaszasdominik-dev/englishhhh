@@ -81,3 +81,38 @@ Word Practice uses only the browser/OS **Web Speech API**. It never calls OpenAI
 - LIVO stores source/license metadata on enriched dictionary entries.
 
 If a built dictionary database is redistributed with an app/service, preserve the required upstream notices and comply with the corresponding dataset licenses.
+
+
+## 50,000+ categorized practice words
+
+The FreeDict importer now keeps the full clean, single-word English-Hungarian catalog practice-eligible and adds:
+- `primaryCategory`
+- `learningBand` (foundation / core / intermediate / advanced / extended)
+- `wordTags`
+- expanded practical themes such as work, business, airport, hotel, shopping, finance, manufacturing, logistics, customer service, meetings and email/phone.
+
+The exact eligible count depends on the upstream FreeDict release. The importer prints a warning if it is below 50,000.
+
+## LIVO 10,000-question bank
+
+The application also contains a deterministic question-bank generator in `backend/question_bank.py`.
+It creates exactly **10,000** categorized items across 25 themes and stores them in MongoDB collection `question_bank`.
+
+The bank is created lazily on the first:
+- `GET /api/questions/status`, or
+- `POST /api/questions/recommend`.
+
+Runtime question generation uses **0 LLM tokens**. Items include drag-to-blank grammar tasks and multiple-choice vocabulary tasks with relevant distractors.
+
+The frontend exposes this bank under **Tanulás → Mondatok**.
+
+
+## One-command local content bootstrap
+
+From the `backend/` directory:
+
+```bash
+python scripts/bootstrap_learning_content.py
+```
+
+This imports/rebuilds both the categorized FreeDict word bank and the deterministic 10,000-question bank, then prints the final MongoDB counts.

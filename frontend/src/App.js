@@ -10,6 +10,7 @@ import { Onboarding } from '@/components/Onboarding';
 import { LiveRoom } from '@/components/LiveRoom';
 import { GameRoom } from '@/components/GameRoom';
 import { WordPracticeRoom } from '@/components/WordPracticeRoom';
+import SituationPractice from '@/components/SituationPractice';
 import { Home, MessagesSquare, GraduationCap, TrendingUp, User, Mic } from 'lucide-react';
 
 const NAV = [
@@ -28,6 +29,7 @@ function Root() {
   const [liveOpen, setLiveOpen] = useState(false);
   const [game, setGame] = useState(null); // { pack, topic }
   const [wordPractice, setWordPractice] = useState(null); // { pack, config }
+  const [situationOpen, setSituationOpen] = useState(false);
 
   const dataRef = useRef(data); dataRef.current = data;
   const engineRef = useRef(null);
@@ -38,6 +40,7 @@ function Root() {
       onData: (s) => store.setData?.(s),
       onFinished: () => setLiveOpen(false),
       saveLivePreference: (languageMix) => store.saveProfile?.({ profile: { liveLanguageMix: languageMix } }),
+      savePracticeFocus: (p) => store.savePracticeFocus?.(p),
     });
   }
   const engine = engineRef.current;
@@ -48,6 +51,7 @@ function Root() {
     engine.cb.onData = (s) => store.setData(s);
     engine.cb.getVocab = () => dataRef.current?.vocabulary || [];
     engine.cb.saveLivePreference = (languageMix) => store.saveProfile?.({ profile: { liveLanguageMix: languageMix } });
+    engine.cb.savePracticeFocus = (p) => store.savePracticeFocus?.(p);
   });
 
   const openLive = (mode = 'business', options = {}) => {
@@ -58,7 +62,7 @@ function Root() {
       : ['english', 'mixed', 'hungarian'].includes(profile.liveLanguageMix)
         ? profile.liveLanguageMix
         : defaultLanguageMixForCefr(profile.cefr || 'B1');
-    engine.open({ mode, teacher, profile, vocab: data?.vocabulary || [], languageMix, initialTask: options.initialTask || null });
+    engine.open({ mode, teacher, profile, vocab: data?.vocabulary || [], languageMix, initialTask: options.initialTask || null, scenario: options.scenario || null });
     setLiveOpen(true);
   };
 
@@ -73,7 +77,7 @@ function Root() {
         <TopBar view={view} data={data} onSettings={() => setView('profile')} onTeacher={() => setTeacherSheet(true)} />
         <main className="livo-scroll flex-1 overflow-y-auto overflow-x-hidden pb-28">
           {view === 'home' && <HomeView data={data} openLive={openLive} goto={setView} onTeacher={() => setTeacherSheet(true)} />}
-          {view === 'practice' && <PracticeView data={data} openLive={openLive} onTeacher={() => setTeacherSheet(true)} />}
+          {view === 'practice' && <PracticeView data={data} openLive={openLive} onTeacher={() => setTeacherSheet(true)} onSituation={() => setSituationOpen(true)} />}
           {view === 'learn' && <LearnView openLive={openLive} onPlay={(pack, topic, id) => setGame({ pack, topic, id })} onWordPractice={(pack, config) => setWordPractice({ pack, config })} />}
           {view === 'progress' && <ProgressView data={data} />}
           {view === 'profile' && <ProfileView onTeacher={() => setTeacherSheet(true)} />}
@@ -84,6 +88,7 @@ function Root() {
         {liveOpen && <LiveRoom engine={engine} />}
         {game && <GameRoom pack={game.pack} topic={game.topic} initialGame={game.id || 'quick'} onClose={() => setGame(null)} />}
         {wordPractice && <WordPracticeRoom pack={wordPractice.pack} config={wordPractice.config} onClose={() => setWordPractice(null)} />}
+        {situationOpen && <SituationPractice data={data} onClose={() => setSituationOpen(false)} onLiveStart={(scenario) => { setSituationOpen(false); openLive('situation', { scenario }); }} />}
         {!onboarded && <Onboarding onDone={(mode) => { if (mode) openLive(mode); }} />}
       </div>
     </div>
