@@ -884,9 +884,10 @@ export class LiveEngine {
 
   situationAskHelp() {
     if (!this.scenario || this.situationFinished || this.situationHelpUsed >= (this.scenario.helpLimit || 1) || this.situationHelpArmed) return;
+    const ok = this.oneShot('Temporarily enter HELP MODE. Say exactly in Hungarian: "Segítek, viszont csak 1 kérdésed lehet! Hallgatlak." Then STOP and wait. Do not answer anything yet and do not advance the scenario.');
+    if (!ok) return;
     this.situationHelpUsed = 1; this.situationHelpArmed = true;
     this.notify();
-    this.oneShot('Temporarily enter HELP MODE. Say exactly in Hungarian: "Segítek, viszont csak 1 kérdésed lehet! Hallgatlak." Then STOP and wait. Do not answer anything yet and do not advance the scenario.');
   }
 
   async verifySituationTurn(seq, turn, text) {
