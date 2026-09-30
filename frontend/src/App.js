@@ -51,7 +51,7 @@ function Root() {
     const teacher = TEACHERS[data?.profile?.teacher] ? data.profile.teacher : 'maya';
     const defaultLang = (data?.user?.locale || 'hu-HU').toLowerCase().startsWith('hu') ? 'hu' : 'en';
     const langMode = options.langMode === 'en' ? 'en' : options.langMode === 'hu' ? 'hu' : defaultLang;
-    engine.open({ mode, teacher, profile: data?.profile || {}, vocab: data?.vocabulary || [], langMode });
+    engine.open({ mode, teacher, profile: data?.profile || {}, vocab: data?.vocabulary || [], langMode, initialTask: options.initialTask || null });
     setLiveOpen(true);
   };
 
@@ -67,7 +67,7 @@ function Root() {
         <main className="livo-scroll flex-1 overflow-y-auto overflow-x-hidden pb-28">
           {view === 'home' && <HomeView data={data} openLive={openLive} goto={setView} onTeacher={() => setTeacherSheet(true)} />}
           {view === 'practice' && <PracticeView data={data} openLive={openLive} onTeacher={() => setTeacherSheet(true)} />}
-          {view === 'learn' && <LearnView onPlay={(pack, topic, id) => setGame({ pack, topic, id })} onWordPractice={(pack, config) => setWordPractice({ pack, config })} />}
+          {view === 'learn' && <LearnView openLive={openLive} onPlay={(pack, topic, id) => setGame({ pack, topic, id })} onWordPractice={(pack, config) => setWordPractice({ pack, config })} />}
           {view === 'progress' && <ProgressView data={data} />}
           {view === 'profile' && <ProfileView onTeacher={() => setTeacherSheet(true)} />}
         </main>
