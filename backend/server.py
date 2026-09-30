@@ -546,6 +546,8 @@ async def scenario_text_turn(request: Request):
                 "frustration": int(body.get("frustration") or 0), "mistakes": [], "newWords": []}
 
     step = steps[step_index]
+    teacher_id = body.get("teacher") if body.get("teacher") in teachers else "maya"
+    teacher_style = teachers.get(teacher_id, teachers["maya"])
     learner = clean_word_field(body.get("learnerText"))[:700]
     transcript = (body.get("transcript") or [])[-10:]
     frustration = max(0, min(3, int(body.get("frustration") or 0)))
@@ -560,6 +562,8 @@ async def scenario_text_turn(request: Request):
     prompt = f"""ROLEPLAY: {scenario['title']}
 AI role: {scenario['aiRole']}
 Learner role: {scenario['userRole']}
+Selected LIVO teacher style: {teacher_style['name']} — {teacher_style['style']}.
+The ROLE is more important than the teacher persona: use the teacher only as delivery flavour. Never switch back into teacher mode during normal role-play.
 CURRENT STEP: {step['id']}
 GOAL: {step['goal']}
 EXPECTED MEANING: {json.dumps(step.get('expected', []))}
