@@ -214,7 +214,7 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
 
 /* ------------------------------------------------------------ Learn */
 const TABS = [['words', 'Szavak'], ['practice', 'Szógyakorló'], ['sentences', 'Mondatok'], ['lab', 'Word Lab'], ['grammar', 'Nyelvtan'], ['focus', 'Gyakorlandó'], ['homework', 'Házi']];
-const TOPICS = ['', 'Üzlet', 'Nyaralás', 'Interjú', 'Repülőtér', 'Étterem', 'Hétköznapok', 'Autózás'];
+const TOPICS = ['', 'Üzlet', 'Munka', 'Meeting', 'E-mail', 'Pénzügy', 'Állásinterjú', 'Utazás', 'Repülőtér', 'Szálloda', 'Étterem', 'Vásárlás', 'Közlekedés', 'Egészség', 'Technológia', 'Oktatás', 'Gyártás', 'Logisztika', 'Ügyfélszolgálat', 'Hétköznapok', 'Otthon'];
 
 export function LearnView({ onPlay, onWordPractice, openLive }) {
   const { data } = useStore();
