@@ -1,7 +1,7 @@
 import React, { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
-import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb } from 'lucide-react';
+import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb, Languages } from 'lucide-react';
 
 // Fire immediately on press (pointerdown). Bulletproof during the live karaoke, where the caption
 // re-renders many times per second and a pointerup/click can be LOST when the pressed word node is
@@ -16,6 +16,7 @@ export function LiveRoom({ engine }) {
   const s = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   const t = TEACHERS[s.teacher] || TEACHERS.james;
   const [showTranscript, setShowTranscript] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
@@ -27,7 +28,13 @@ export function LiveRoom({ engine }) {
         <button data-testid="live-close" onClick={() => engine.end()} className="h-9 w-9 grid place-items-center rounded-full bg-white/10 active:scale-90 transition-transform"><X size={18} /></button>
         <div className="flex items-center gap-2.5">
           <img alt={t.name} src={t.img} className="h-9 w-9 rounded-full object-cover ring-2 ring-white/20" />
-          <div className="leading-none"><b className="text-sm">{t.name}</b><div className="text-[11px] text-slate-400">{MODE_NAMES[s.mode]}</div></div>
+          <div className="leading-none">
+            <b className="text-sm">{t.name}</b>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400">{MODE_NAMES[s.mode]} · {s.cefrLevel || 'B1'}</span>
+              <LanguageMixControl s={s} engine={engine} open={showLanguageMenu} setOpen={setShowLanguageMenu} />
+            </div>
+          </div>
         </div>
         <div className="text-right leading-none">
           <div className={`font-heading font-extrabold text-lg tabular-nums ${s.timeLeft <= 120 && s.timeLeft > 0 ? 'text-amber2' : ''}`}>{formatClock(s.timeLeft)}</div>
@@ -220,6 +227,63 @@ export function LiveRoom({ engine }) {
       {/* Summary modal */}
       <AnimatePresence>
         {s.phase === 'summary' && s.summary && <SummaryModal s={s} engine={engine} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function LanguageMixControl({ s, engine, open, setOpen }) {
+  const options = [
+    ['english', 'EN', 'Végig angolul', 'Csak angol, a szintedhez igazítva'],
+    ['mixed', 'MIX', 'Vegyes', 'Angol + rövid magyar segítség'],
+    ['hungarian', 'HU', 'Magyar segítség', 'Magyar instrukció, angol célok'],
+  ];
+  const current = options.find(x => x[0] === s.languageMix) || options[1];
+
+  return (
+    <div className="relative">
+      <button
+        data-testid="live-language-mix"
+        onClick={() => setOpen(v => !v)}
+        className="inline-flex items-center gap-1 rounded-full bg-white/[0.08] ring-1 ring-white/10 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-200 active:scale-95 transition-transform"
+        aria-label="Beszéd nyelve"
+        aria-expanded={open}
+      >
+        <Languages size={11} /> {current[1]}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            data-testid="live-language-menu"
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            className="absolute z-[80] top-8 left-0 w-56 overflow-hidden rounded-2xl bg-[#151D30] shadow-2xl ring-1 ring-white/15 p-1.5"
+          >
+            <div className="px-2.5 pt-2 pb-1">
+              <div className="text-[9px] tracking-[0.2em] font-bold text-slate-500">TANÁR BESZÉDNYELVE</div>
+              <div className="text-[10px] text-slate-400 mt-1">A nehézség automatikusan {s.cefrLevel || 'B1'} szintű.</div>
+            </div>
+            {options.map(([id, short, label, desc]) => {
+              const active = s.languageMix === id;
+              return (
+                <button
+                  key={id}
+                  data-testid={`live-language-${id}`}
+                  onClick={() => { engine.setLanguageMix(id); setOpen(false); }}
+                  className={`w-full rounded-xl px-2.5 py-2.5 text-left flex items-center gap-2.5 transition-colors ${active ? 'bg-brand/20' : 'hover:bg-white/[0.06]'}`}
+                >
+                  <span className={`h-7 min-w-9 px-1.5 rounded-lg grid place-items-center text-[10px] font-black ${active ? 'bg-brand text-white' : 'bg-white/10 text-slate-300'}`}>{short}</span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-xs text-white">{label}</b>
+                    <small className="block text-[10px] leading-tight text-slate-400 mt-0.5">{desc}</small>
+                  </span>
+                  {active && <Check size={13} className="text-brand-ring shrink-0" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
