@@ -153,7 +153,7 @@ def _item(qid, theme, qtype, skill, subskill, cefr, prompt, correct, wrong1, wro
         "prompt": prompt, "options": options, "correctAnswer": correct,
         "correctIndex": options.index(correct), "target": target,
         "explanationHu": explanation, "status": "active",
-        "sourceMethod": "deterministic_curated_template",
+        "sourceMethod": "deterministic_curated_template", "bankVersion": 2,
     }
 
 def generate_question_bank():
@@ -217,7 +217,7 @@ def generate_question_bank():
 
 async def ensure_question_bank(db):
     col = db.question_bank
-    count = await col.count_documents({"status":"active"})
+    count = await col.count_documents({"status":"active", "bankVersion": 2})
     if count >= 10000:
         return count
     await col.delete_many({"sourceMethod":"deterministic_curated_template"})
