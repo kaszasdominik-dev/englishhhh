@@ -44,7 +44,7 @@ TOPIC_ALIASES = {
     'otthon':'home','lakas':'home','lakás':'home','ingatlan':'home','home':'home',
     'vasarlas':'shopping','vásárlás':'shopping','shopping':'shopping','bolt':'shopping',
     'meeting':'meetings','megbeszeles':'meetings','megbeszélés':'meetings',
-    'email':'email_phone','telefon':'email_phone','phone':'email_phone',
+    'email':'email_phone','e-mail':'email_phone','telefon':'email_phone','phone':'email_phone',
     'penzugy':'finance','pénzügy':'finance','finance':'finance',
     'gyartas':'manufacturing','gyártás':'manufacturing','manufacturing':'manufacturing',
     'logisztika':'logistics','logistics':'logistics',
