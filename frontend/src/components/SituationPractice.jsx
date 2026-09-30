@@ -90,7 +90,7 @@ export default function SituationPractice({ data, onClose, onLiveStart }) {
       }
       const r = await api('/scenario/text-turn', {
         method: 'POST',
-        body: JSON.stringify({ scenarioId: scenario.id, stepIndex, turnCount, frustration, learnerText: value, transcript: transcriptPayload([userMsg]) }),
+        body: JSON.stringify({ scenarioId: scenario.id, teacher: data?.profile?.teacher || 'maya', stepIndex, turnCount, frustration, learnerText: value, transcript: transcriptPayload([userMsg]) }),
       });
       const aiMsg = { role: 'assistant', text: r.assistantText || '' };
       setMessages(prev => [...prev, aiMsg]);
