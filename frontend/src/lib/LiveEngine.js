@@ -905,7 +905,11 @@ export class LiveEngine {
     try {
       if (this.situationHelpArmed) {
         this.situationHelpArmed = false;
-        this.situationClearHelpAfterResponse = true;
+        if (this.assistantSpeaking || this.manualResponseInFlight) {
+          this.situationClearHelpAfterResponse = true;
+        } else {
+          this.appendInstruction(`HELP MODE OVER. Return fully to role as ${this.scenario.aiRole}. Remain on step ${this.currentSituationStep()?.id || ''} until the scenario controller advances it.`);
+        }
         this.notify();
         return;
       }
