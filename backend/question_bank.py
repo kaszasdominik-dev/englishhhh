@@ -4,7 +4,6 @@ No runtime LLM generation is used. The bank is generated from curated themes,
 verbs and vocabulary, then stored in MongoDB on first use.
 """
 import random
-from pymongo import ASCENDING
 
 THEMES = {
     "daily_life": {
@@ -223,7 +222,7 @@ async def ensure_question_bank(db):
     rows = generate_question_bank()
     for i in range(0, len(rows), 1000):
         await col.insert_many(rows[i:i+1000], ordered=False)
-    await col.create_index([("id", ASCENDING)], unique=True)
-    await col.create_index([("theme", ASCENDING), ("cefr", ASCENDING), ("skill", ASCENDING), ("subskill", ASCENDING)])
-    await col.create_index([("questionType", ASCENDING), ("status", ASCENDING)])
+    await col.create_index([("id", 1)], unique=True)
+    await col.create_index([("theme", 1), ("cefr", 1), ("skill", 1), ("subskill", 1)])
+    await col.create_index([("questionType", 1), ("status", 1)])
     return len(rows)
