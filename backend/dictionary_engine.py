@@ -49,6 +49,11 @@ TOPIC_ALIASES = {
     'gyartas':'manufacturing','gyártás':'manufacturing','manufacturing':'manufacturing',
     'logisztika':'logistics','logistics':'logistics',
     'ugyfelszolgalat':'customer_service','ügyfélszolgálat':'customer_service','customer service':'customer_service',
+    'szalloda':'hotel','szálloda':'hotel','hotel':'hotel',
+    'kozlekedes':'transport','közlekedés':'transport','transport':'transport',
+    'egeszseg':'health','egészség':'health','health':'health',
+    'technologia':'it','technológia':'it','technology':'it',
+    'oktatas':'education','oktatás':'education','education':'education',
 }
 
 HU_TOPIC_HINTS = {
