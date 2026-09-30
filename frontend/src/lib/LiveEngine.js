@@ -888,7 +888,10 @@ export class LiveEngine {
 
   situationAskHelp() {
     if (!this.scenario || this.situationFinished || this.situationHelpUsed >= (this.scenario.helpLimit || 1) || this.situationHelpArmed) return;
-    const ok = this.oneShot('Temporarily enter HELP MODE. Say exactly in Hungarian: "Segítek, viszont csak 1 kérdésed lehet! Hallgatlak." Then STOP and wait. Do not answer anything yet and do not advance the scenario.');
+    if (this.dc?.readyState !== 'open' || this.finishing || this.timeLimitReached || this.manualResponseInFlight || this.assistantSpeaking) return;
+    const step = this.currentSituationStep();
+    this.appendInstruction(`TEMPORARY ROLEPLAY HELP: The NEXT learner utterance is their one help question, not an answer to the scenario. Answer that one question briefly in Hungarian, with at most one useful English model phrase. Then repeat the current role-play line in English: ${JSON.stringify(step?.opening || '')}. Do not advance the scenario because of the help question.`);
+    const ok = this.oneShot('Say exactly in Hungarian: "Segítek, viszont csak 1 kérdésed lehet! Hallgatlak." Then stop and wait for the learner question.');
     if (!ok) return;
     this.situationHelpUsed = 1; this.situationHelpArmed = true;
     this.notify();
