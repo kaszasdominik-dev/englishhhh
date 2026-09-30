@@ -62,7 +62,7 @@ export default function SituationPractice({ data, onClose, onLiveStart }) {
         method: 'POST',
         body: JSON.stringify({
           teacher: data?.profile?.teacher || 'maya', mode: 'situation', scenarioId: scenario.id,
-          durationSeconds: Math.max(60, turnCount * 35), transcript: transcriptPayload(extraMessages),
+          durationSeconds: Math.max(60, turnCount * 35), transcript: transcriptPayload(extraMessages), observedMistakes: sessionMistakes,
           baselineVocabulary: (data?.vocabulary || []).map(v => v.term).filter(Boolean),
         }),
       });
