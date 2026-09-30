@@ -32,7 +32,8 @@ TOPIC_KEYWORDS = {
 }
 
 TOPIC_ALIASES = {
-    'uzlet':'business','üzlet':'business','munka':'business','business':'business','office':'business','iroda':'business',
+    'uzlet':'business','üzlet':'business','business':'business','office':'business','iroda':'business',
+    'munka':'work','work':'work','allas':'work','állás':'work',
     'utazas':'travel','utazás':'travel','nyaralas':'travel','nyaralás':'travel','travel':'travel',
     'repuloter':'airport','repülőtér':'airport','airport':'airport',
     'etterem':'restaurant','étterem':'restaurant','etel':'restaurant','étel':'restaurant','food':'restaurant','restaurant':'restaurant',
@@ -42,6 +43,12 @@ TOPIC_ALIASES = {
     'it':'it','informatika':'it','programozas':'it','programozás':'it','software':'it',
     'otthon':'home','lakas':'home','lakás':'home','ingatlan':'home','home':'home',
     'vasarlas':'shopping','vásárlás':'shopping','shopping':'shopping','bolt':'shopping',
+    'meeting':'meetings','megbeszeles':'meetings','megbeszélés':'meetings',
+    'email':'email_phone','telefon':'email_phone','phone':'email_phone',
+    'penzugy':'finance','pénzügy':'finance','finance':'finance',
+    'gyartas':'manufacturing','gyártás':'manufacturing','manufacturing':'manufacturing',
+    'logisztika':'logistics','logistics':'logistics',
+    'ugyfelszolgalat':'customer_service','ügyfélszolgálat':'customer_service','customer service':'customer_service',
 }
 
 HU_TOPIC_HINTS = {
