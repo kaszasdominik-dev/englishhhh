@@ -131,12 +131,7 @@ THEMES = {
         "hu":"Ügyfélszolgálat",
         "actions":[("help","helps","helped","helped","helping","the customer"),("solve","solves","solved","solved","solving","the problem"),("refund","refunds","refunded","refunded","refunding","the payment"),("replace","replaces","replaced","replaced","replacing","the item"),("apologise","apologises","apologised","apologised","apologising","for the delay"),("confirm","confirms","confirmed","confirmed","confirming","the order"),("handle","handles","handled","handled","handling","the complaint"),("explain","explains","explained","explained","explaining","the policy")],
         "vocab":[("complaint","panasz"),("refund","visszatérítés"),("replacement","cserepéldány"),("support","támogatás"),("policy","szabályzat"),("resolve","megoldani"),("apologise","elnézést kérni"),("warranty","garancia")]
-    },
-    "communication": {
-        "hu":"Kommunikáció",
-        "actions":[("explain","explains","explained","explained","explaining","the problem"),("ask","asks","asked","asked","asking","a question"),("answer","answers","answered","answered","answering","clearly"),("repeat","repeats","repeated","repeated","repeating","the sentence"),("describe","describes","described","described","describing","the situation"),("mention","mentions","mentioned","mentioned","mentioning","the reason"),("clarify","clarifies","clarified","clarified","clarifying","the details"),("agree","agrees","agreed","agreed","agreeing","with the idea")],
-        "vocab":[("explain","elmagyarázni"),("clarify","tisztázni"),("repeat","megismételni"),("meaning","jelentés"),("opinion","vélemény"),("reason","ok"),("detail","részlet"),("conversation","beszélgetés")]
-    },
+    }
 }
 
 assert len(THEMES) == 25
