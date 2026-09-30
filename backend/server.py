@@ -699,6 +699,23 @@ async def word_help(request: Request):
     direction = body.get('direction') if body.get('direction') in ('hu_en', 'en_hu', 'auto') else 'auto'
     if not word:
         return JSONResponse({"error": "Missing word."}, status_code=400)
+
+    # Fast zero-token path: use the imported English-Hungarian dictionary first.
+    if direction in ('en_hu', 'auto') and len(word.split()) <= 5:
+        local = await db.dictionary.find_one({"termLower": word.lower()})
+        if local and local.get("meaning"):
+            source = clean_word_field(local.get("term") or word)
+            translation = clean_word_field(local.get("meaning"))
+            definition = clean_word_field(local.get("definitionEn") or "")
+            example = clean_word_field(local.get("exampleEn") or local.get("example") or "")
+            return {
+                "source": source, "sourceLanguage": "en", "translation": translation,
+                "explanation": definition or f"{source} = {translation}.",
+                "contextMeaning": translation if not example else f"{translation} · {example}",
+                "saveable": True, "canonicalSource": source, "sourceType": "local_dictionary",
+                "runtimeLlmTokens": 0,
+            }
+
     if not OPENAI_API_KEY:
         return JSONResponse({"error": "OPENAI_API_KEY is not set.", "code": "NO_API_KEY"}, status_code=503)
     schema = {"type": "object", "additionalProperties": False, "properties": {
