@@ -105,3 +105,14 @@ The bank is created lazily on the first:
 Runtime question generation uses **0 LLM tokens**. Items include drag-to-blank grammar tasks and multiple-choice vocabulary tasks with relevant distractors.
 
 The frontend exposes this bank under **Tanulás → Mondatok**.
+
+
+## One-command local content bootstrap
+
+From the `backend/` directory:
+
+```bash
+python scripts/bootstrap_learning_content.py
+```
+
+This imports/rebuilds both the categorized FreeDict word bank and the deterministic 10,000-question bank, then prints the final MongoDB counts.
