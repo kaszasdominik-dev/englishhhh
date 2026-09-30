@@ -178,6 +178,8 @@ def generate_question_bank():
                 local.append(("modal_should", _item("",theme,"drag_blank","grammar","modal_should","A2",f"We should ___ {comp} carefully.",base,past,ing,"A should után az ige alapalakban áll.",base)))
                 local.append(("first_conditional", _item("",theme,"drag_blank","grammar","first_conditional","B1",f"If we {base} {comp} today, we ___ be ready tomorrow.","will","would","did","First Conditional: if + Present Simple, majd will + alapalak.",base)))
                 local.append(("second_conditional", _item("",theme,"drag_blank","grammar","second_conditional","B1",f"If I had more time, I ___ {base} {comp}.","would","will","did","Second Conditional: if + Past Simple, majd would + alapalak.",base)))
+                local.append(("past_perfect", _item("",theme,"drag_blank","grammar","past_perfect","B2",f"By the time the deadline arrived, we had already ___ {comp}.",pp,past,base,"Past Perfectben a had után past participle áll.",base)))
+                local.append(("inversion_after_only", _item("",theme,"drag_blank","grammar","inversion_after_only","C1",f"Only after we had ___ {comp} did the situation become clear.",pp,past,ing,"Az 'Only after...' szerkezet után a főmondatban inverzió áll; a had után past participle szükséges.",base)))
 
             for vi, (term, hu) in enumerate(data["vocab"]):
                 other = [x[0] for x in data["vocab"] if x[0] != term]
