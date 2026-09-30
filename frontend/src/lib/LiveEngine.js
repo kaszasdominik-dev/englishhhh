@@ -1202,7 +1202,7 @@ export class LiveEngine {
     this.notify();
     const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 14000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
       this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
