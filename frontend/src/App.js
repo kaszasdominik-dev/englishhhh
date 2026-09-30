@@ -3,6 +3,7 @@ import '@/App.css';
 import { StoreProvider, useStore } from '@/lib/store';
 import { LiveEngine } from '@/lib/LiveEngine';
 import { TEACHERS } from '@/lib/livo';
+import { defaultLanguageMixForCefr } from '@/lib/liveAdaptation';
 import { HomeView, PracticeView, LearnView, ProgressView, ProfileView } from '@/views';
 import { TeacherSheet } from '@/components/TeacherSheet';
 import { Onboarding } from '@/components/Onboarding';
@@ -36,6 +37,7 @@ function Root() {
       saveVocab: (p) => store.saveVocabulary?.(p, { quiet: p?.quiet === true }),
       onData: (s) => store.setData?.(s),
       onFinished: () => setLiveOpen(false),
+      saveLivePreference: (languageMix) => store.saveProfile?.({ profile: { liveLanguageMix: languageMix } }),
     });
   }
   const engine = engineRef.current;
@@ -45,13 +47,18 @@ function Root() {
     engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: p?.quiet === true });
     engine.cb.onData = (s) => store.setData(s);
     engine.cb.getVocab = () => dataRef.current?.vocabulary || [];
+    engine.cb.saveLivePreference = (languageMix) => store.saveProfile?.({ profile: { liveLanguageMix: languageMix } });
   });
 
   const openLive = (mode = 'business', options = {}) => {
     const teacher = TEACHERS[data?.profile?.teacher] ? data.profile.teacher : 'maya';
-    const defaultLang = (data?.user?.locale || 'hu-HU').toLowerCase().startsWith('hu') ? 'hu' : 'en';
-    const langMode = options.langMode === 'en' ? 'en' : options.langMode === 'hu' ? 'hu' : defaultLang;
-    engine.open({ mode, teacher, profile: data?.profile || {}, vocab: data?.vocabulary || [], langMode, initialTask: options.initialTask || null });
+    const profile = data?.profile || {};
+    const languageMix = ['english', 'mixed', 'hungarian'].includes(options.languageMix)
+      ? options.languageMix
+      : ['english', 'mixed', 'hungarian'].includes(profile.liveLanguageMix)
+        ? profile.liveLanguageMix
+        : defaultLanguageMixForCefr(profile.cefr || 'B1');
+    engine.open({ mode, teacher, profile, vocab: data?.vocabulary || [], languageMix, initialTask: options.initialTask || null });
     setLiveOpen(true);
   };
 

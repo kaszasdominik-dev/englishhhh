@@ -290,21 +290,84 @@ def dictionary_progress_entry(state, dictionary_id, term=''):
     return item
 
 # ------------------------------------------------------------------ tutor prompt
-def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace):
+def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace, language_mix='mixed'):
     t = teachers.get(teacher, teachers['maya'])
     m = modes.get(mode, modes['business'])
-    level = profile.get('cefr', 'B1')
+    raw_level = str(profile.get('cefr', 'B1') or 'B1').upper()
+    level = next((x for x in ('A1', 'A2', 'B1', 'B2', 'C1') if raw_level.startswith(x)), 'B1')
     hu = profile.get('huHelp', 'on_request')
     correction = profile.get('correctionStyle', 'balanced')
     name = learner_name or profile.get('name', '')
-    hu_lock = ("HUNGARIAN LANGUAGE LOCK \u2014 ACTIVE\n- ALL teacher meta-speech, explanations, praise, corrections, jokes, questions, transitions and instructions MUST be in natural Hungarian.\n- English may appear ONLY when quoting/pronouncing the exact target word, phrase or example sentence being taught.\n- Never use English classroom glue such as \u201cListen\u201d, \u201cNow you\u201d, \u201cTry again\u201d, \u201cGood\u201d, \u201cExactly\u201d, \u201cOkay\u201d, \u201cYour turn\u201d. Use Hungarian equivalents.\n" if language_mode == 'hu' else "")
-    pace_lock = ("PACING LOCK \u2014 ACTIVE: speak noticeably slower, use shorter sentences and one idea at a time.\n" if pace == 'slow' else "")
+    language_mix = language_mix if language_mix in ('english', 'mixed', 'hungarian') else (
+        'english' if language_mode == 'en' else 'hungarian' if language_mode == 'hu' else 'mixed'
+    )
+
+    language_contracts = {
+        'english': """LANGUAGE MIX — ENGLISH ONLY
+- Conduct the lesson in English only.
+- Keep the English at the learner's CEFR level. If they struggle, simplify, slow down and rephrase in easier English.
+- Do NOT automatically translate into Hungarian. A one-off Hungarian clarification is allowed only if the learner explicitly asks for that exact clarification; then return to English.
+""",
+        'mixed': """LANGUAGE MIX — BILINGUAL SUPPORT
+- English is the main practice language, with short natural Hungarian support.
+- Aim for a clean roughly 50/50 teaching mix at beginner levels: say the useful English first, then clarify briefly in Hungarian when needed.
+- Do NOT produce broken mixed-language sentences. Switch only at clean sentence/clause boundaries.
+- As the learner succeeds, naturally increase the amount of English inside the same session.
+""",
+        'hungarian': """LANGUAGE MIX — HUNGARIAN SUPPORT
+- ALL teacher meta-speech, explanations, praise, corrections, jokes, questions, transitions and instructions are in natural Hungarian.
+- English appears for the actual target word, phrase, model sentence or English practice.
+- Never use English classroom glue when a natural Hungarian instruction is available.
+""",
+    }
+
+    level_contracts = {
+        'A1': """CEFR DIFFICULTY — A1
+- Use very common vocabulary and concrete everyday topics.
+- English turns are usually 2–7 words or one very short sentence.
+- Focus on be/have/can, Present Simple, basic questions, numbers, time, family, food, work and daily routines.
+- Ask one tiny thing at a time. Prefer short answer, either/or and very simple WH questions.
+- Introduce at most ONE new word or grammar idea per turn. Repeat useful English naturally.
+- Speak slowly and leave extra thinking time. Never jump to B1/B2 phrasing just because the learner succeeds once.
+""",
+        'A2': """CEFR DIFFICULTY — A2
+- Use common everyday and work vocabulary with short natural sentences.
+- English turns are usually one or two short sentences.
+- Practise Present/Past Simple, going to/will, basic comparatives, frequency, requests and common prepositions.
+- Ask one question at a time and build from concrete facts to short descriptions.
+- New vocabulary should be useful and high-frequency; scaffold before increasing difficulty.
+""",
+        'B1': """CEFR DIFFICULTY — B1
+- Use natural conversational English at moderate speed.
+- Use practical everyday and workplace vocabulary plus some common collocations.
+- Practise narration, Present Perfect, conditionals, opinions, reasons and short explanations.
+- Ask follow-ups that require 1–3 sentence answers, but keep one clear objective per turn.
+- Challenge the learner slightly above comfort level, then scaffold only when needed.
+""",
+        'B2': """CEFR DIFFICULTY — B2
+- Use natural adult conversational speed and authentic phrasing.
+- Include collocations, phrasal verbs, nuance, hypothetical situations and more precise vocabulary.
+- Ask for reasons, comparisons, trade-offs and short argumentation.
+- Use less Hungarian scaffolding unless the selected language mix calls for it.
+- Correct recurring or meaning-changing issues; do not over-explain obvious points.
+""",
+        'C1': """CEFR DIFFICULTY — C1
+- Use fully natural adult English, nuanced vocabulary, idiomatic collocations and complex structures.
+- Encourage precision, register choice, paraphrasing, concise argumentation and subtle distinctions in meaning.
+- Do not artificially simplify unless the learner asks.
+- Corrections should target precision, naturalness, register and recurring advanced errors rather than basic fluency.
+""",
+    }
+
+    language_contract = language_contracts[language_mix]
+    level_contract = level_contracts[level]
+    pace_lock = ("PACING LOCK — ACTIVE: speak noticeably slower, use shorter sentences and one idea at a time.\n" if pace == 'slow' else "")
     task_frame_language = (
-        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the Hungarian fixed task frames below; do not use their English equivalents.\n"
-        if language_mode == 'hu' else
-        "TASK FRAME LANGUAGE — ACTIVE: use ONLY the English fixed task frames below; do not use their Hungarian equivalents.\n"
-        if language_mode == 'en' else
-        "TASK FRAME LANGUAGE: follow the language currently used for teacher instructions, and never mix the Hungarian and English task frames in one task.\n"
+        "TASK FRAME LANGUAGE — use the English fixed frames below.\n"
+        if language_mix == 'english' else
+        "TASK FRAME LANGUAGE — use the Hungarian fixed frames below.\n"
+        if language_mix == 'hungarian' else
+        "TASK FRAME LANGUAGE — in bilingual mode choose ONE clean frame matching the current instruction language; never splice Hungarian and English inside one frame.\n"
     )
     mem = "\n".join('- ' + x for x in memory[:18]) if memory else '- No saved learning memory yet.'
     return f"""You are {t['name']}, a premium 1-to-1 AI English tutor inside LIVO for a Hungarian learner{(' named ' + name) if name else ''}. Your job is to teach English through a natural, human-feeling live conversation. NEVER sound like a rigid bot or classroom script.
@@ -328,7 +391,7 @@ SESSION TIME CONTRACT — HIGHEST PRIORITY
 - Never say \u201cm\u00e1ra ennyi\u201d or give a final recap early. A learner question like \u201cez ennyi?\u201d is NOT an instruction to end.
 - End early only when the learner clearly asks to finish.
 
-{hu_lock}{pace_lock}{task_frame_language}
+{language_contract}{level_contract}{pace_lock}{task_frame_language}
 MODE CONTRACT — THIS OVERRIDES GENERIC LESSON FLOW
 {modeBehaviors.get(mode, modeBehaviors['free'])}
 - Sound like a good private tutor who adapts in real time. Never moralise about tone, slang or swearing.
@@ -421,14 +484,17 @@ async def live_session(request: Request):
     memory += [f"grammar: {g.get('pattern')}; mastery {g.get('mastery')}%; example {g.get('original')} \u2192 {g.get('corrected')}" for g in grammar]
     if isinstance(body.get('memory'), list):
         memory += body['memory'][:6]
-    lang = 'hu' if body.get('languageMode') == 'hu' else ('en' if body.get('languageMode') == 'en' else None)
+    language_mix = body.get('languageMix') if body.get('languageMix') in ('english', 'mixed', 'hungarian') else None
+    if not language_mix:
+        language_mix = 'hungarian' if body.get('languageMode') == 'hu' else ('english' if body.get('languageMode') == 'en' else 'mixed')
+    lang = 'hu' if language_mix == 'hungarian' else ('en' if language_mix == 'english' else None)
     pace = 'slow' if body.get('pace') == 'slow' else 'normal'
     duration = clamp(int(body.get('durationMinutes') or 15), 5, 60)
     merged_profile = {**profile, **(body.get('profile') or {})}
     session = {
         'model': LIVE_MODEL,
         'instructions': tutor_prompt(teacher, body.get('mode', 'business'), merged_profile, memory,
-                                     state.get('user', {}).get('name', ''), duration, lang, pace),
+                                     state.get('user', {}).get('name', ''), duration, lang, pace, language_mix),
         'audio': {'output': {'voice': t['voice']}},
         'delegation': {'type': 'responses', 'responses': {
             'model': REASONING_MODEL,
@@ -444,7 +510,8 @@ async def live_session(request: Request):
         if 'json' in ct:
             payload = r.json()
             if r.status_code < 400:
-                payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business')}
+                payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business'),
+                                   'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
             return JSONResponse(payload, status_code=r.status_code)
         return Response(content=r.text, status_code=r.status_code, media_type=ct or 'application/json')
     except Exception as e:
