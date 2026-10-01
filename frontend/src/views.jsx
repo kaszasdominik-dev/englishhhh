@@ -69,9 +69,9 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
         <div className="flex items-baseline justify-between">
           <h3 className="font-heading font-bold text-ink">Ma ezt érdemes gyakorolnod</h3>
         </div>
-        <FocusCard onClick={() => openLive('business')} icon={Briefcase} title="Business English" sub="Negotiation · 12–20 perc" tag="Folytatás" />
+        <FocusCard onClick={() => openLive('free')} icon={MessagesSquare} title="Beszélgetés" sub="Hétköznapi angol · 10–15 perc" tag="Indítás" />
         <FocusCard onClick={() => goto('learn')} icon={Sparkles} title="Szógyakorló" sub={due.map(x => x.term).join(' · ') || 'kiejtés · helyesírás · ismétlés'} tag="3–5 perc" />
-        <FocusCard onClick={() => openLive('grammar')} icon={Wand2} title="Past simple" sub="take → took · grow → grew" tag="6 perc" />
+        <FocusCard onClick={() => openLive('grammar')} icon={Wand2} title="Nyelvtan" sub={(data?.grammar || [])[0]?.title || 'Igeidők · mondatalkotás'} tag="6 perc" />
       </section>
 
       {/* Homework */}
