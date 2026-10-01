@@ -61,7 +61,7 @@ export function Onboarding({ onDone }) {
       },
       user: { onboarded: true },
     }, true);
-    onDone('free');
+    onDone?.();
   };
 
   if (placementOpen) {
@@ -143,7 +143,7 @@ export function Onboarding({ onDone }) {
             <button onClick={() => setStep(1)} className="inline-flex items-center gap-1 text-sm text-ink-mute mb-3"><ArrowLeft size={14} /> Tanulási út módosítása</button>
             <span className="text-[11px] tracking-[0.2em] font-bold text-brand">3 / 3 · ANGOLODSZINT</span>
             <h1 className="font-heading font-extrabold text-3xl text-ink mt-2 leading-tight text-balance">Tudod, körülbelül milyen szinten vagy?</h1>
-            <p className="text-sm text-ink-mute mt-2">Ha nem vagy biztos benne, a LIVO 10–14 adaptív kérdésből készít egy CEFR-alapú szintbecslést.</p>
+            <p className="text-sm text-ink-mute mt-2">Ha nem vagy biztos benne, a LIVO 10–12 adaptív kérdésből készít egy CEFR-alapú szintbecslést.</p>
 
             <div className="space-y-2.5 mt-5">
               {LEVELS.map(l => {
