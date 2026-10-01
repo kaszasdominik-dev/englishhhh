@@ -4,7 +4,38 @@ import { TEACHERS, TEACHER_IDS } from '@/lib/livo';
 import { ArrowRight, ArrowLeft, Play, Check } from 'lucide-react';
 import { PlacementTest } from '@/components/PlacementTest';
 
-const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1+'];
+const LEVELS = [
+  {
+    id: 'A1',
+    title: 'Kezdő',
+    desc: 'Alapmondatok és nagyon egyszerű helyzetek: bemutatkozás, számok, idő, rendelés, alap kérdések.',
+    gaps: 'Tipikus hiányok: kevés szókincs, múlt és jövő idő, hosszabb mondatok, folyamatos beszéd.',
+  },
+  {
+    id: 'A2',
+    title: 'Alapszint',
+    desc: 'Hétköznapi témákról már elboldogulsz: munka, család, vásárlás, utazás, egyszerű múlt és jövő.',
+    gaps: 'Tipikus hiányok: összetettebb mondatok, igeidők biztos használata, gyors beszéd megértése.',
+  },
+  {
+    id: 'B1',
+    title: 'Középszint',
+    desc: 'A legtöbb hétköznapi helyzetben megérteted magad, elmondod a véleményed és munkahelyi témákról is beszélsz.',
+    gaps: 'Tipikus hiányok: igeidők keverése, elöljárók, természetesebb szóhasználat, magabiztos spontán beszéd.',
+  },
+  {
+    id: 'B2',
+    title: 'Erős középszint',
+    desc: 'Folyékonyabban beszélsz, részletesen érvelsz, meetingeken és összetettebb témákban is jól boldogulsz.',
+    gaps: 'Tipikus hiányok: finom nyelvtani pontosság, idiómák, természetes fordulatok és árnyalt szóválasztás.',
+  },
+  {
+    id: 'C1+',
+    title: 'Haladó',
+    desc: 'Összetett szakmai és hétköznapi témákról természetesen, részletesen és kevés megakadással kommunikálsz.',
+    gaps: 'Tipikus hiányok: ritkább kifejezések, stílusárnyalatok, idiomatikusabb és közel anyanyelvi pontosság.',
+  },
+];
 
 export function Onboarding({ onDone }) {
   const { data, saveProfile, previewTeacher } = useStore();
@@ -114,12 +145,28 @@ export function Onboarding({ onDone }) {
             <h1 className="font-heading font-extrabold text-3xl text-ink mt-2 leading-tight text-balance">Tudod, körülbelül milyen szinten vagy?</h1>
             <p className="text-sm text-ink-mute mt-2">Ha nem vagy biztos benne, a LIVO 10–14 adaptív kérdésből készít egy CEFR-alapú szintbecslést.</p>
 
-            <div className="grid grid-cols-3 gap-2 mt-5">
-              {LEVELS.map(l => (
-                <button key={l} data-testid={`onb-level-${l}`} onClick={() => setLevel(l)} className={`rounded-2xl py-3.5 font-heading font-extrabold text-lg transition-all ${level === l ? 'bg-brand text-white ring-2 ring-brand' : 'bg-white text-ink ring-1 ring-slate-200'}`}>
-                  {l}
-                </button>
-              ))}
+            <div className="space-y-2.5 mt-5">
+              {LEVELS.map(l => {
+                const selected = level === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    data-testid={`onb-level-${l.id}`}
+                    onClick={() => setLevel(l.id)}
+                    className={`relative w-full rounded-2xl p-4 text-left transition-all ${selected ? 'bg-brand-soft ring-2 ring-brand' : 'bg-white ring-1 ring-slate-200'}`}
+                  >
+                    {selected && <span className="absolute top-4 right-4 h-6 w-6 rounded-full bg-brand text-white grid place-items-center"><Check size={13} /></span>}
+                    <div className="flex items-start gap-3 pr-8">
+                      <span className={`shrink-0 min-w-12 rounded-xl px-2.5 py-2 text-center font-heading font-extrabold text-lg ${selected ? 'bg-brand text-white' : 'bg-slate-100 text-ink'}`}>{l.id}</span>
+                      <div>
+                        <div className="font-heading font-bold text-base text-ink">{l.title}</div>
+                        <p className="text-xs text-ink-mute leading-relaxed mt-1">{l.desc}</p>
+                        <p className="text-[11px] text-ink-soft leading-relaxed mt-1.5">{l.gaps}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <button data-testid="onb-placement" onClick={() => setPlacementOpen(true)} className="mt-4 w-full rounded-2xl bg-task-bg text-task-text p-4 text-left ring-1 ring-task-accent/30">
@@ -128,7 +175,7 @@ export function Onboarding({ onDone }) {
               <span className="block text-xs text-slate-300 mt-1">Adaptív nyelvtan · szókincs · olvasás · hallásértés</span>
             </button>
 
-            <button data-testid="onb-finish" disabled={!level} onClick={() => finish(level)} className="mt-auto w-full rounded-full bg-brand text-white font-semibold py-3.5 inline-flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40">
+            <button data-testid="onb-finish" disabled={!level} onClick={() => finish(level)} className="mt-6 w-full rounded-full bg-brand text-white font-semibold py-3.5 inline-flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40">
               Kezdjük <ArrowRight size={16} />
             </button>
           </div>
