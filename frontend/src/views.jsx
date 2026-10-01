@@ -26,9 +26,9 @@ function Ring({ value, max, children }) {
 
 export function HomeView({ data, openLive, goto, onTeacher }) {
   const { toggleHomework } = useStore();
-  const p = data.profile, s = data.stats;
+  const p = data?.profile || {}, s = data?.stats || {};
   const t = TEACHERS[p.teacher] || TEACHERS.james;
-  const due = data.vocabulary.filter(v => v.status === 'uncertain').slice(0, 3);
+  const due = (data?.vocabulary || []).filter(v => v.status === 'uncertain').slice(0, 3);
   return (
     <div className="px-5 pt-5 space-y-6">
       {/* Hero */}
@@ -162,7 +162,7 @@ function FocusCard({ onClick, icon: Icon, title, sub, tag }) {
 }
 
 export function PracticeView({ data, openLive, onTeacher, onSituation }) {
-  const t = TEACHERS[data.profile.teacher] || TEACHERS.james;
+  const t = TEACHERS[data?.profile?.teacher] || TEACHERS.james;
   const [langMode, setLangMode] = useState(() => localStorage.getItem('livo_live_language') || 'hu');
   const setLanguage = (value) => { setLangMode(value); localStorage.setItem('livo_live_language', value); };
   const liveModes = Object.values(MODES).filter(m => m.id !== 'vocabulary');
@@ -243,7 +243,7 @@ function WordBank({ data }) {
   const [filter, setFilter] = useState('all');
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ term: '', meaning: '', example: '' });
-  let list = data.vocabulary.filter(v => ((v.term || '') + ' ' + (v.meaning || '')).toLowerCase().includes(q.toLowerCase()));
+  let list = (data?.vocabulary || []).filter(v => ((v.term || '') + ' ' + (v.meaning || '')).toLowerCase().includes(q.toLowerCase()));
   if (filter === 'saved') list = list.filter(v => v.saved);
   if (filter === 'due') list = list.filter(v => v.status === 'uncertain' || v.status === 'learning');
   if (filter === 'hard') list = list.filter(v => (v.status === 'uncertain') || (v.mastery ?? 40) < 60 || (v.wrong_count || 0) > (v.correct_count || 0));
@@ -313,7 +313,7 @@ function WordPracticeSetup({ data, onStart, onLiveStart }) {
       if (source === 'recommended') {
         const r = await api('/dictionary/recommend', {
           method: 'POST',
-          body: JSON.stringify({ topic: normalizeSpeechText(topic), level: data.profile?.cefr || 'B1', count: Math.max(count, 8) }),
+          body: JSON.stringify({ topic: normalizeSpeechText(topic), level: data?.profile?.cefr || 'B1', count: Math.max(count, 8) }),
         });
         pack = Array.isArray(r.words) ? r.words.slice(0, count) : [];
       }
@@ -428,7 +428,7 @@ function WordLab({ data, onPlay }) {
     const chosen = normalizeSpeechText(custom || topic).slice(0, 80);
     setBusy(id);
     try {
-      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data.profile?.cefr || 'B1', count }) });
+      const r = await api('/game/topic', { method: 'POST', body: JSON.stringify({ topic: chosen, level: data?.profile?.cefr || 'B1', count }) });
       const words = Array.isArray(r.words) ? r.words : [];
       if (words.length < 4) throw new Error('Túl kevés helyi szó ehhez a témához. Próbálj másik témát vagy Randomot.');
       onPlay(words, chosen || 'Random', id);
@@ -546,13 +546,13 @@ function HomeworkPane({ data }) {
 
 /* ------------------------------------------------------------ Progress */
 export function ProgressView({ data }) {
-  const s = data.stats;
+  const s = data?.stats || {};
   const vals = [8, 0, 12, 6, 0, 7, 5], days = ['H', 'K', 'Sze', 'Cs', 'P', 'Szo', 'V'];
   const cards = [
     { icon: Clock, label: 'Összes beszéd', val: `${s.totalMinutes || 0} perc`, sub: 'ezen a héten +' + (s.weekMinutes || 0) },
-    { icon: Check, label: 'Stabil szókincs', val: data.vocabulary.filter(v => v.status === 'stable').length, sub: `${data.vocabulary.filter(v => v.status === 'learning').length} tanulás alatt` },
+    { icon: Check, label: 'Stabil szókincs', val: (data?.vocabulary || []).filter(v => v.status === 'stable').length, sub: `${(data?.vocabulary || []).filter(v => v.status === 'learning').length} tanulás alatt` },
     { icon: Flame, label: 'Sorozat', val: `${computeStreak(data.sessions || []).streak} nap`, sub: 'Rendszeres gyakorlás' },
-    { icon: Trophy, label: 'Szintbecslés', val: data.profile.cefr || 'B1', sub: 'Nem hivatalos CEFR' },
+    { icon: Trophy, label: 'Szintbecslés', val: data?.profile?.cefr || 'B1', sub: 'Nem hivatalos CEFR' },
   ];
   return (
     <div className="px-5 pt-5 space-y-4">
@@ -596,10 +596,11 @@ export function ProgressView({ data }) {
 /* ------------------------------------------------------------ Profile */
 export function ProfileView({ onTeacher }) {
   const { data, saveProfile, resetLearning } = useStore();
-  const p = data.profile;
+  const p = data?.profile || {};
   const t = TEACHERS[p.teacher] || TEACHERS.james;
   const set = (patch) => saveProfile({ profile: patch });
-  const rem = Math.max(0, (data.subscription.includedMinutes || 0) - (data.subscription.usedMinutes || 0));
+  const subscription = data?.subscription || {};
+  const rem = Math.max(0, (subscription.includedMinutes || 0) - (subscription.usedMinutes || 0));
   return (
     <div className="px-5 pt-5 space-y-4">
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
@@ -627,10 +628,10 @@ export function ProfileView({ onTeacher }) {
       <SessionHistory sessions={data.sessions || []} />
 
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
-        <div className="flex items-center justify-between mb-3"><h3 className="font-heading font-bold text-ink">Előfizetés</h3><span className="text-[10px] font-bold text-ink-mute bg-slate-100 rounded-full px-2.5 py-1">{data.subscription.plan}</span></div>
+        <div className="flex items-center justify-between mb-3"><h3 className="font-heading font-bold text-ink">Előfizetés</h3><span className="text-[10px] font-bold text-ink-mute bg-slate-100 rounded-full px-2.5 py-1">{subscription.plan || 'Próba'}</span></div>
         <div className="font-heading font-extrabold text-2xl text-ink">{rem} perc</div>
         <div className="text-xs text-ink-mute">maradt ebben az időszakban</div>
-        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${pct(rem / (data.subscription.includedMinutes || 1) * 100)}%` }} /></div>
+        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${pct(rem / (subscription.includedMinutes || 1) * 100)}%` }} /></div>
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
