@@ -76,12 +76,28 @@ def now_iso():
 
 # ------------------------------------------------------------------ state (mongo)
 async def load_state():
+    seed = json.loads((ROOT_DIR / 'seed_state.json').read_text(encoding='utf-8'))
     doc = await db.livo_state.find_one({"_id": "demo-user"})
     if not doc:
-        seed = json.loads((ROOT_DIR / 'seed_state.json').read_text(encoding='utf-8'))
         seed['_id'] = 'demo-user'
         await db.livo_state.replace_one({"_id": "demo-user"}, seed, upsert=True)
-        doc = seed
+        return seed
+
+    # Backward-compatible state migration: older local Mongo documents may miss
+    # newer top-level/nested fields (for example profile after a schema update).
+    changed = False
+    for key, default in seed.items():
+        if key not in doc or doc.get(key) is None:
+            doc[key] = json.loads(json.dumps(default))
+            changed = True
+            continue
+        if isinstance(default, dict) and isinstance(doc.get(key), dict):
+            for subkey, subdefault in default.items():
+                if subkey not in doc[key] or doc[key].get(subkey) is None:
+                    doc[key][subkey] = json.loads(json.dumps(subdefault))
+                    changed = True
+    if changed:
+        await db.livo_state.replace_one({"_id": "demo-user"}, doc, upsert=True)
     return doc
 
 async def save_state(state):
