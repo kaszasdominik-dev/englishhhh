@@ -95,7 +95,7 @@ export function PlacementTest({ onComplete, onBack }) {
 
       <div className="mt-5 flex items-center justify-between">
         <span className="text-[10px] tracking-widest font-bold text-ink-faint">{SKILL_LABELS[question.skill] || question.skill}</span>
-        <span className="text-[10px] font-bold text-ink-faint">kb. 10–14 kérdés</span>
+        <span className="text-[10px] font-bold text-ink-faint">kb. 10–12 kérdés</span>
       </div>
 
       <section className="rounded-[1.5rem] bg-white p-5 ring-1 ring-slate-100 shadow-soft mt-2">
