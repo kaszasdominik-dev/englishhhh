@@ -126,7 +126,7 @@ export function PlacementTest({ onComplete, onBack }) {
         </button>
       </section>
 
-      <p className="text-[11px] text-ink-faint mt-4 text-center">A kérdések nehézsége a válaszaid alapján változik.</p>
+      <p className="text-[11px] text-ink-faint mt-4 text-center">Általános, hétköznapi angolt mérünk — nem a profilodból vagy korábbi témáidból választunk. A nehézség csak a válaszaid alapján változik.</p>
     </div>
   );
 }
