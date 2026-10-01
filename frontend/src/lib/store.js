@@ -1,13 +1,45 @@
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { api } from './api';
+import { api, BACKEND_URL } from './api';
 import { TEACHERS, normalizeSpeechText } from './livo';
 import { toast } from 'sonner';
 
 const StoreCtx = createContext(null);
 export const useStore = () => useContext(StoreCtx);
 
+const DEFAULT_STATE = {
+  user: { onboarded: false },
+  profile: { cefr: 'B1', teacher: 'james', weeklyMinutes: 120, correctionStyle: 'balanced', huHelp: 'on_request' },
+  subscription: { plan: 'Próba', includedMinutes: 60, usedMinutes: 0 },
+  stats: { totalMinutes: 0, weekMinutes: 0 },
+  vocabulary: [],
+  grammar: [],
+  sessions: [],
+  homework: [],
+  practiceFocus: [],
+};
+
+export function normalizeState(raw) {
+  const state = raw && typeof raw === 'object' ? raw : {};
+  return {
+    ...DEFAULT_STATE,
+    ...state,
+    user: { ...DEFAULT_STATE.user, ...(state.user || {}) },
+    profile: { ...DEFAULT_STATE.profile, ...(state.profile || {}) },
+    subscription: { ...DEFAULT_STATE.subscription, ...(state.subscription || {}) },
+    stats: { ...DEFAULT_STATE.stats, ...(state.stats || {}) },
+    vocabulary: Array.isArray(state.vocabulary) ? state.vocabulary : [],
+    grammar: Array.isArray(state.grammar) ? state.grammar : [],
+    sessions: Array.isArray(state.sessions) ? state.sessions : [],
+    homework: Array.isArray(state.homework) ? state.homework : [],
+    practiceFocus: Array.isArray(state.practiceFocus) ? state.practiceFocus : [],
+  };
+}
+
 export function StoreProvider({ children }) {
-  const [data, setData] = useState(null);
+  const [data, setDataRaw] = useState(null);
+  const setData = useCallback((next) => {
+    setDataRaw(prev => normalizeState(typeof next === 'function' ? next(prev ? normalizeState(prev) : normalizeState({})) : next));
+  }, []);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
 
@@ -91,7 +123,7 @@ export function StoreProvider({ children }) {
   const previewTeacher = useCallback(async (id) => {
     const t = TEACHERS[id]; if (!t) return;
     try {
-      const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/voice-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher: id, text: t.preview }) });
+      const r = await fetch(`${BACKEND_URL}/api/voice-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher: id, text: t.preview }) });
       if (!r.ok) throw new Error('no api');
       const blob = await r.blob();
       if (previewRef.current) previewRef.current.pause();
