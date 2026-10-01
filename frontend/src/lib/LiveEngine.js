@@ -162,15 +162,26 @@ export class LiveEngine {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
           body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, scenarioId: this.scenario?.id || null, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
         });
-        payload = await res.json();
+        const raw = await res.text();
+        try {
+          payload = raw ? JSON.parse(raw) : {};
+        } catch {
+          // Never turn a non-JSON server/proxy error page into a misleading JSON.parse network error.
+          payload = res.ok ? { transport: { sdp: raw } } : { error: raw || `Session error ${res.status}` };
+        }
       } catch (fe) {
         clearTimeout(to);
         throw new Error(fe.name === 'AbortError' ? 'A szerver nem válaszolt időben (munkamenet).' : `Hálózati hiba: ${fe.message}`);
       }
       clearTimeout(to);
-      if (!res.ok) { const err = new Error(typeof payload.error === 'string' ? payload.error : `Session error ${res.status}`); err.code = payload.code; throw err; }
+      if (!res.ok) {
+        const serverMessage = typeof payload?.error === 'string' ? payload.error : `Session error ${res.status}`;
+        const err = new Error(serverMessage.slice(0, 500)); err.code = payload?.code; throw err;
+      }
+      const remoteSdp = payload?.transport?.sdp || payload?.sdp;
+      if (!remoteSdp) throw new Error('A szerver nem adott vissza érvényes WebRTC SDP választ.');
       if (!isReconnect) { this.setDiag('session', 'done'); this.setDiag('webrtc', 'active'); }
-      await pc.setRemoteDescription({ type: 'answer', sdp: payload.transport.sdp });
+      await pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp });
       if (!isReconnect) {
         pc.addEventListener('iceconnectionstatechange', () => {
           if (this.pc !== pc) return;
