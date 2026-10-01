@@ -9,9 +9,9 @@ const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1+'];
 export function Onboarding({ onDone }) {
   const { data, saveProfile, previewTeacher } = useStore();
   const [step, setStep] = useState(0);
-  const [teacher, setTeacher] = useState(data.profile.teacher || 'maya');
-  const [path, setPath] = useState(data.profile.learningPath === 'guided' ? 'guided' : 'conversation');
-  const [level, setLevel] = useState(data.profile.cefr || '');
+  const [teacher, setTeacher] = useState(data?.profile?.teacher || 'maya');
+  const [path, setPath] = useState(data?.profile?.learningPath === 'guided' ? 'guided' : 'conversation');
+  const [level, setLevel] = useState(data?.profile?.cefr || '');
   const [placementOpen, setPlacementOpen] = useState(false);
 
   const finish = async (cefr, placement = null, source = 'self_reported') => {
