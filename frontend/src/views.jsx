@@ -50,7 +50,7 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
       </section>
 
       {/* Streak */}
-      <StreakCard sessions={data.sessions || []} />
+      <StreakCard sessions={data?.sessions || []} />
 
       {/* Weekly goal */}
       <section className="flex items-center gap-4 rounded-[1.5rem] bg-white p-5 shadow-soft ring-1 ring-slate-100">
@@ -81,7 +81,7 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
           <button onClick={() => goto('learn')} className="text-xs font-semibold text-brand">Tanulás</button>
         </div>
         <div className="space-y-2">
-          {(data.homework || []).slice(0, 3).map(h => (
+          {(data?.homework || []).slice(0, 3).map(h => (
             <label key={h.id} data-testid={`home-hw-${h.id}`} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3 cursor-pointer">
               <input type="checkbox" checked={!!h.done} onChange={e => toggleHomework(h.id, e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
               <span><b className="text-sm text-ink block">{h.title}</b><small className="text-xs text-ink-mute">{h.minutes || 3} perc</small></span>
@@ -228,7 +228,7 @@ export function LearnView({ onPlay, onWordPractice, openLive }) {
       </div>
       {tab === 'words' && <WordBank data={data} />}
       {tab === 'practice' && <WordPracticeSetup data={data} onStart={onWordPractice} onLiveStart={(task) => openLive?.('vocabulary', { initialTask: task })} />}
-      {tab === 'sentences' && <QuestionPracticeRoom defaultLevel={data.profile?.cefr || 'B1'} />}
+      {tab === 'sentences' && <QuestionPracticeRoom defaultLevel={data?.profile?.cefr || 'B1'} />}
       {tab === 'lab' && <WordLab data={data} onPlay={onPlay} />}
       {tab === 'grammar' && <GrammarPane data={data} />}
       {tab === 'focus' && <PracticeFocusPane data={data} />}
@@ -296,7 +296,7 @@ function WordPracticeSetup({ data, onStart, onLiveStart }) {
   const [busy, setBusy] = useState(false);
   const [autoSaveMistakes, setAutoSaveMistakes] = useState(true);
 
-  const saved = useMemo(() => [...(data.vocabulary || [])].sort((a, b) => (a.mastery ?? 40) - (b.mastery ?? 40)), [data.vocabulary]);
+  const saved = useMemo(() => [...(data?.vocabulary || [])].sort((a, b) => (a.mastery ?? 40) - (b.mastery ?? 40)), [data?.vocabulary]);
   const hard = useMemo(() => saved.filter(w => (w.status === 'uncertain') || (w.mastery ?? 40) < 60 || (w.wrong_count || 0) > (w.correct_count || 0)), [saved]);
 
   const start = async () => {
@@ -490,7 +490,7 @@ function WordLab({ data, onPlay }) {
 function GrammarPane({ data }) {
   return (
     <div className="space-y-3">
-      {data.grammar.map((g, i) => (
+      {(data?.grammar || []).map((g, i) => (
         <div key={i} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-100">
           <div className="flex items-center justify-between"><small className="text-xs text-ink-mute">{g.mastery}% · {g.trend}</small><span className="text-xs font-semibold text-brand">{g.title}</span></div>
           <p className="text-sm text-rose2 line-through mt-2">{g.original}</p>
@@ -504,7 +504,7 @@ function GrammarPane({ data }) {
 
 function PracticeFocusPane({ data }) {
   const { deletePracticeFocus } = useStore();
-  const items = data.practiceFocus || [];
+  const items = data?.practiceFocus || [];
   return (
     <div className="space-y-3">
       {items.length === 0 && (
@@ -533,8 +533,8 @@ function HomeworkPane({ data }) {
   const { toggleHomework } = useStore();
   return (
     <div className="space-y-2">
-      {(data.homework || []).length === 0 && <div className="text-center text-sm text-ink-faint py-10">Nincs aktuális házi.</div>}
-      {(data.homework || []).map(h => (
+      {(data?.homework || []).length === 0 && <div className="text-center text-sm text-ink-faint py-10">Nincs aktuális házi.</div>}
+      {(data?.homework || []).map(h => (
         <label key={h.id} className="flex items-start gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-100 cursor-pointer">
           <input type="checkbox" checked={!!h.done} onChange={e => toggleHomework(h.id, e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
           <span><b className="text-sm text-ink block">{h.title}</b><small className="text-xs text-ink-mute">{h.detail} · {h.minutes || 3} perc</small></span>
@@ -551,7 +551,7 @@ export function ProgressView({ data }) {
   const cards = [
     { icon: Clock, label: 'Összes beszéd', val: `${s.totalMinutes || 0} perc`, sub: 'ezen a héten +' + (s.weekMinutes || 0) },
     { icon: Check, label: 'Stabil szókincs', val: (data?.vocabulary || []).filter(v => v.status === 'stable').length, sub: `${(data?.vocabulary || []).filter(v => v.status === 'learning').length} tanulás alatt` },
-    { icon: Flame, label: 'Sorozat', val: `${computeStreak(data.sessions || []).streak} nap`, sub: 'Rendszeres gyakorlás' },
+    { icon: Flame, label: 'Sorozat', val: `${computeStreak(data?.sessions || []).streak} nap`, sub: 'Rendszeres gyakorlás' },
     { icon: Trophy, label: 'Szintbecslés', val: data?.profile?.cefr || 'B1', sub: 'Nem hivatalos CEFR' },
   ];
   return (
@@ -581,7 +581,7 @@ export function ProgressView({ data }) {
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <h3 className="font-heading font-bold text-ink text-sm mb-3">Visszatérő minták</h3>
         <div className="space-y-3">
-          {data.grammar.slice(0, 4).map((g, i) => (
+          {(data?.grammar || []).slice(0, 4).map((g, i) => (
             <div key={i} className="flex items-center gap-3">
               <div className="flex-1"><div className="text-xs text-ink-soft mb-1">{g.pattern}</div><div className="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${g.mastery}%` }} /></div></div>
               <b className="text-sm text-ink w-10 text-right">{g.mastery}%</b>
@@ -625,7 +625,7 @@ export function ProfileView({ onTeacher }) {
         </div>
       </div>
 
-      <SessionHistory sessions={data.sessions || []} />
+      <SessionHistory sessions={data?.sessions || []} />
 
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex items-center justify-between mb-3"><h3 className="font-heading font-bold text-ink">Előfizetés</h3><span className="text-[10px] font-bold text-ink-mute bg-slate-100 rounded-full px-2.5 py-1">{subscription.plan || 'Próba'}</span></div>
