@@ -18,9 +18,10 @@ load_dotenv(ROOT_DIR / '.env')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("livo")
 
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'livo')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 PEXELS_API_KEY = os.environ.get('PEXELS_API_KEY', '')
