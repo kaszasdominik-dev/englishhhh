@@ -1,5 +1,5 @@
 export const PLACEMENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-export const PLACEMENT_MAX_QUESTIONS = 14;
+export const PLACEMENT_MAX_QUESTIONS = 12;
 export const PLACEMENT_MIN_QUESTIONS = 10;
 
 const levelValue = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5 };
@@ -10,54 +10,59 @@ const q = (id, cefr, skill, prompt, options, answer, extra = {}) => ({
 });
 
 export const PLACEMENT_QUESTIONS = [
-  q('a1_g1','A1','grammar','Choose the correct word: I ___ from Hungary.',['am','is','are','be'],'am'),
-  q('a1_g2','A1','grammar','Choose the correct sentence.',['She like coffee.','She likes coffee.','She liking coffee.','She do like coffee.'],'She likes coffee.'),
-  q('a1_v1','A1','vocabulary','What does “chair” mean?',['asztal','szék','ajtó','ablak'],'szék'),
-  q('a1_v2','A1','vocabulary','Which word means “reggel”?',['morning','evening','night','week'],'morning'),
-  q('a1_r1','A1','reading','Anna works in a shop. She starts at 8:00. When does Anna start work?',['At 7:00','At 8:00','At 9:00','At 10:00'],'At 8:00'),
-  q('a1_r2','A1','reading','Tom has two cats and one dog. How many pets does Tom have?',['One','Two','Three','Four'],'Three'),
-  q('a1_l1','A1','listening','Hallgasd meg, majd válaszolj: Where is the speaker going?',['home','to work','to school','to a restaurant'],'to work',{ audioText:'I am going to work now.' }),
-  q('a1_l2','A1','listening','Hallgasd meg, majd válaszolj: What does the speaker want?',['water','coffee','tea','milk'],'water',{ audioText:'Can I have some water, please?' }),
+  // A1 — basic everyday English
+  q('a1_g1','A1','grammar','Choose the correct word: I ___ tired.',['am','is','are','be'],'am'),
+  q('a1_g2','A1','grammar','Choose the correct sentence.',['She have two brothers.','She has two brothers.','She having two brothers.','She is have two brothers.'],'She has two brothers.'),
+  q('a1_v1','A1','vocabulary','What does “hungry” mean?',['éhes','fáradt','szomjas','mérges'],'éhes'),
+  q('a1_v2','A1','vocabulary','Which word means “konyha”?',['bedroom','kitchen','garden','bathroom'],'kitchen'),
+  q('a1_r1','A1','reading','Emma gets up at 7:00 and leaves home at 7:40. When does she get up?',['At 6:40','At 7:00','At 7:40','At 8:00'],'At 7:00'),
+  q('a1_r2','A1','reading','Ben likes apples, but he does not like bananas. What does Ben like?',['Apples','Bananas','Both','Neither'],'Apples'),
+  q('a1_l1','A1','listening','Hallgasd meg: What should the listener close?',['the door','the window','the book','the bag'],'the window',{ audioText:'Please close the window. It is cold in here.' }),
+  q('a1_l2','A1','listening','Hallgasd meg: When is the speaker’s birthday?',['March','May','July','October'],'May',{ audioText:'My birthday is in May.' }),
 
-  q('a2_g1','A2','grammar','Yesterday I ___ to the office.',['go','went','gone','going'],'went'),
-  q('a2_g2','A2','grammar','There ___ any milk in the fridge.',['isn’t','aren’t','don’t','doesn’t'],'isn’t'),
-  q('a2_v1','A2','vocabulary','Which word is closest to “cheap”?',['expensive','inexpensive','heavy','slow'],'inexpensive'),
-  q('a2_v2','A2','vocabulary','What does “borrow” mean?',['kölcsönadni','kölcsönkérni','eladni','megjavítani'],'kölcsönkérni'),
-  q('a2_r1','A2','reading','Marta missed the bus, so she walked to work. Why did she walk?',['She likes walking.','She missed the bus.','Her car broke down.','She was early.'],'She missed the bus.'),
-  q('a2_r2','A2','reading','The meeting starts at 2, but please arrive fifteen minutes early. When should you arrive?',['1:15','1:30','1:45','2:15'],'1:45'),
-  q('a2_l1','A2','listening','Hallgasd meg: What did the speaker do last night?',['worked','watched a film','cooked dinner','went running'],'watched a film',{ audioText:'Last night I stayed home and watched a film.' }),
-  q('a2_l2','A2','listening','Hallgasd meg: Why is the speaker late?',['traffic','overslept','missed the train','lost the keys'],'traffic',{ audioText:'Sorry I am late. The traffic was terrible this morning.' }),
+  // A2 — common situations, simple past/future and everyday vocabulary
+  q('a2_g1','A2','grammar','Yesterday we ___ dinner at home.',['eat','ate','eaten','eating'],'ate'),
+  q('a2_g2','A2','grammar','This book is ___ than the other one.',['interesting','more interesting','most interesting','interest'],'more interesting'),
+  q('a2_v1','A2','vocabulary','What does “neighbour” mean?',['szomszéd','rokon','utas','tanár'],'szomszéd'),
+  q('a2_v2','A2','vocabulary','Which word is closest to “usually”?',['never','normally','suddenly','only'],'normally'),
+  q('a2_r1','A2','reading','Luca missed the bus, so she took a taxi. Why did she take a taxi?',['She was tired.','She missed the bus.','She likes taxis.','It was raining.'],'She missed the bus.'),
+  q('a2_r2','A2','reading','The museum opens at 10, but we want to arrive twenty minutes early. When should we arrive?',['9:20','9:40','10:20','10:40'],'9:40'),
+  q('a2_l1','A2','listening','Hallgasd meg: Why could the speaker not sleep?',['It was hot.','The neighbours were noisy.','They were hungry.','They were working.'],'The neighbours were noisy.',{ audioText:'I could not sleep because the neighbours were very noisy.' }),
+  q('a2_l2','A2','listening','Hallgasd meg: Where will they meet?',['at the station','outside the cinema','at home','in a café'],'outside the cinema',{ audioText:'Let us meet outside the cinema at half past six.' }),
 
+  // B1 — independent everyday communication, without business vocabulary
   q('b1_g1','B1','grammar',"I've lived here ___ 2022.",['for','since','from','during'],'since'),
   q('b1_g2','B1','grammar','If it rains tomorrow, we ___ at home.',['stay','stayed','will stay','would stay'],'will stay'),
-  q('b1_v1','B1','vocabulary','What does “deadline” mean?',['határidő','munkakör','fizetés','szerződés'],'határidő'),
-  q('b1_v2','B1','vocabulary','Which word best completes this? We need to ___ a solution.',['reach','take','bring','arrive'],'reach'),
-  q('b1_r1','B1','reading','The company introduced flexible hours to reduce stress. Staff can now start between 7 and 10. What changed?',['Salaries increased.','Starting times became flexible.','The office moved.','Working days became shorter.'],'Starting times became flexible.'),
-  q('b1_r2','B1','reading','Peter accepted the offer although the salary was lower because the role offered better career prospects. Why did he accept it?',['Higher salary','Shorter commute','Better career prospects','More holidays'],'Better career prospects'),
-  q('b1_l1','B1','listening','Hallgasd meg: What is the problem?',['The order is late.','The invoice is wrong.','The client cancelled.','The price increased.'],'The invoice is wrong.',{ audioText:'I checked the invoice and the total amount is not correct.' }),
-  q('b1_l2','B1','listening','Hallgasd meg: What will the speaker do next?',['call the supplier','send an email','cancel the order','wait until Friday'],'call the supplier',{ audioText:'The parts still have not arrived, so I will call the supplier this afternoon.' }),
+  q('b1_v1','B1','vocabulary','What does “avoid” mean?',['elkerülni','megengedni','elfelejteni','megérkezni'],'elkerülni'),
+  q('b1_v2','B1','vocabulary','Which word best completes this? I was tired, ___ I went to bed early.',['so','although','unless','while'],'so'),
+  q('b1_r1','B1','reading','Nora started cycling to work because the bus was often crowded. She says cycling also gives her more energy in the morning. Why did she change how she travels?',['The bus was often crowded.','She sold her car.','Her office moved.','Cycling is free at weekends.'],'The bus was often crowded.'),
+  q('b1_r2','B1','reading','They planned to spend the weekend by the lake, but the weather forecast predicted heavy rain, so they changed their plans and stayed in the city. Why did they change their plans?',['They were ill.','The hotel was full.','Heavy rain was expected.','They missed the train.'],'Heavy rain was expected.'),
+  q('b1_l1','B1','listening','Hallgasd meg: What is the speaker still doing?',['looking for a house','unpacking boxes','painting the kitchen','buying furniture'],'unpacking boxes',{ audioText:'I moved into my new flat last week, but I am still unpacking boxes.' }),
+  q('b1_l2','B1','listening','Hallgasd meg: What will the speaker probably do?',['go for a walk','stay inside','visit a friend','cook outside'],'stay inside',{ audioText:'I wanted to go for a walk, but it has started raining heavily, so I think I will stay in.' }),
 
-  q('b2_g1','B2','grammar','If I ___ about the problem earlier, I would have helped.',['knew','had known','would know','have known'],'had known'),
-  q('b2_g2','B2','grammar','The report ___ by Friday, according to the manager.',['must finish','must be finished','must have finish','is must finished'],'must be finished'),
-  q('b2_v1','B2','vocabulary','Which word is closest to “reluctant”?',['eager','unwilling','certain','confused'],'unwilling'),
-  q('b2_v2','B2','vocabulary','Choose the best phrase: The new system should ___ efficiency.',['enhance','rise','grow up','enlarge'],'enhance'),
-  q('b2_r1','B2','reading','Although the proposal was initially rejected, the team revised the financial assumptions and resubmitted it. It was approved the following week. What led to approval?',['A new team','A lower price','Revised financial assumptions','A different deadline'],'Revised financial assumptions'),
-  q('b2_r2','B2','reading','The author argues that remote work increases autonomy, but warns that weak communication routines can undermine collaboration. What is the main point?',['Remote work always fails.','Autonomy and communication both matter.','Office work is more efficient.','Collaboration is unnecessary.'],'Autonomy and communication both matter.'),
-  q('b2_l1','B2','listening','Hallgasd meg: What is the speaker suggesting?',['cancel the project','delay the launch','hire more people','reduce the price'],'delay the launch',{ audioText:'Given the remaining technical issues, I think we should push the launch back by two weeks rather than rush it.' }),
-  q('b2_l2','B2','listening','Hallgasd meg: What is the speaker’s main concern?',['cost','quality','schedule','staff turnover'],'quality',{ audioText:'We can probably meet the deadline, but I am worried that moving this quickly will compromise quality.' }),
+  // B2 — more nuanced grammar and meaning, still general-life topics
+  q('b2_g1','B2','grammar','If I ___ about the traffic, I would have left earlier.',['knew','had known','would know','have known'],'had known'),
+  q('b2_g2','B2','grammar','The old bridge ___ next year.',['will repair','will be repaired','will be repair','repairs'],'will be repaired'),
+  q('b2_v1','B2','vocabulary','Which word is closest to “reluctant”?',['unwilling','excited','certain','careless'],'unwilling'),
+  q('b2_v2','B2','vocabulary','What does “eventually” mean in this sentence: “Eventually, we found the right address.”?',['azonnal','végül','véletlenül','ritkán'],'végül'),
+  q('b2_r1','B2','reading','Many people silence phone notifications while studying. This does not remove every distraction, but it can make it easier to stay focused for longer periods. What is the main idea?',['Phones make studying impossible.','Silencing notifications can help concentration.','People should never use phones.','Long study sessions are always better.'],'Silencing notifications can help concentration.'),
+  q('b2_r2','B2','reading','Mira enjoys running, but she stopped following a strict training plan because it made exercise feel like an obligation. She now runs when she feels like it and enjoys it more. Why did she change her routine?',['She became injured.','She wanted exercise to feel less forced.','She had less free time.','She started swimming instead.'],'She wanted exercise to feel less forced.'),
+  q('b2_l1','B2','listening','Hallgasd meg: Why is the speaker unsure about joining the hike?',['the distance','the weather','the people','the cost'],'the weather',{ audioText:'I would really like to join the hike, but the weather forecast makes me hesitate.' }),
+  q('b2_l2','B2','listening','Hallgasd meg: What does the speaker suggest?',['leaving now','waiting a little longer','cancelling everything','asking someone else'],'waiting a little longer',{ audioText:'We could leave now, but I would rather wait another half hour and see if the rain gets lighter.' }),
 
-  q('c1_g1','C1','grammar','Hardly ___ the meeting started when the fire alarm went off.',['had','has','did','was'],'had'),
-  q('c1_g2','C1','grammar','Choose the most natural sentence.',['Not only the plan failed, but it was costly too.','Not only did the plan fail, but it was also costly.','Not only did fail the plan, but costly it was.','The plan not only did fail but costly.'],'Not only did the plan fail, but it was also costly.'),
-  q('c1_v1','C1','vocabulary','Which word is closest to “ambiguous”?',['unclear','obvious','irrelevant','precise'],'unclear'),
-  q('c1_v2','C1','vocabulary','Choose the best word: The evidence does not ___ such a strong conclusion.',['warrant','owe','claim','afford'],'warrant'),
-  q('c1_r1','C1','reading','The policy may improve short-term output, yet its long-term effect is uncertain because the incentives could encourage quantity at the expense of quality. What is the author’s reservation?',['Output will fall immediately.','The policy is too expensive.','Quality may suffer in the long term.','The incentives are too weak.'],'Quality may suffer in the long term.'),
-  q('c1_r2','C1','reading','The report stops short of recommending regulation; instead, it argues that voluntary standards should first be tested under independent oversight. What does it advocate initially?',['Immediate regulation','No oversight','Testing voluntary standards','Abandoning standards'],'Testing voluntary standards'),
-  q('c1_l1','C1','listening','Hallgasd meg: What is implied?',['The proposal is ready.','The proposal needs further work.','The proposal was rejected permanently.','No decision is possible.'],'The proposal needs further work.',{ audioText:'I would not dismiss the proposal, but in its current form I would hesitate to recommend approval.' }),
-  q('c1_l2','C1','listening','Hallgasd meg: What is the speaker’s position?',['strongly supportive','cautiously supportive','completely opposed','indifferent'],'cautiously supportive',{ audioText:'There are clear benefits, provided we address the implementation risks before committing to a full rollout.' }),
+  // C1 — advanced nuance; these should appear only after strong earlier answers
+  q('c1_g1','C1','grammar','Choose the most natural sentence.',['Rarely I have seen such a quiet place.','Rarely have I seen such a quiet place.','Rarely did I have seen such a quiet place.','Rarely I saw have such a quiet place.'],'Rarely have I seen such a quiet place.'),
+  q('c1_g2','C1','grammar','I bought extra food, but in the end nobody came. I ___ so much.',['needn’t have bought','mustn’t buy','didn’t need buy','wouldn’t have buy'],'needn’t have bought'),
+  q('c1_v1','C1','vocabulary','Which word is closest to “ambiguous”?',['unclear','obvious','ordinary','precise'],'unclear'),
+  q('c1_v2','C1','vocabulary','Which word best fits? Her answer was so ___ that I could not tell whether she agreed.',['straightforward','subtle','identical','permanent'],'subtle'),
+  q('c1_r1','C1','reading','People often assume that remembering more information means learning better. However, being able to connect ideas and apply them in a new situation may be a stronger sign of understanding. What distinction does the text make?',['Memory and understanding are not always the same.','Remembering facts is useless.','New situations are easier than old ones.','People should study less.'],'Memory and understanding are not always the same.'),
+  q('c1_r2','C1','reading','The writer is not arguing that social media is inherently harmful. Rather, the concern is that constant interruption can gradually reduce our tolerance for sustained attention. What is the writer’s main concern?',['All social media should be banned.','People communicate too much.','Frequent interruption may weaken sustained attention.','Online content is too difficult.'],'Frequent interruption may weaken sustained attention.'),
+  q('c1_l1','C1','listening','Hallgasd meg: What is implied?',['The speaker completely dislikes the idea.','The speaker sees value but has reservations.','The speaker has no opinion.','The speaker fully agrees without conditions.'],'The speaker sees value but has reservations.',{ audioText:'I can see why people like the idea, although I am not convinced it would work equally well for everyone.' }),
+  q('c1_l2','C1','listening','Hallgasd meg: What does the speaker mean?',['The film was perfect.','The film was terrible.','The film had flaws but was still enjoyable.','The speaker did not watch the film.'],'The film had flaws but was still enjoyable.',{ audioText:'It was not without its flaws, but overall I found the film surprisingly engaging.' }),
 ];
 
 export function initialPlacementState() {
-  return { ability: 2.6, history: [], usedIds: [], skillCounts: {} };
+  return { ability: 2.05, history: [], usedIds: [], skillCounts: {} };
 }
 
 export function selectNextQuestion(state) {
@@ -76,7 +81,7 @@ export function selectNextQuestion(state) {
 
 export function answerPlacementQuestion(state, question, selected) {
   const correct = selected === question.answer;
-  const direction = correct ? 0.42 : -0.48;
+  const direction = correct ? 0.34 : -0.44;
   const difficultyGap = question.difficulty - state.ability;
   const adjustment = direction + (correct ? Math.max(0, difficultyGap) * 0.12 : Math.min(0, difficultyGap) * 0.08);
   const ability = clamp(state.ability + adjustment, 1, 5);
