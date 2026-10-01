@@ -89,7 +89,7 @@ function Root() {
         {game && <GameRoom pack={game.pack} topic={game.topic} initialGame={game.id || 'quick'} onClose={() => setGame(null)} />}
         {wordPractice && <WordPracticeRoom pack={wordPractice.pack} config={wordPractice.config} onClose={() => setWordPractice(null)} />}
         {situationOpen && <SituationPractice data={data} onClose={() => setSituationOpen(false)} onLiveStart={(scenario) => { setSituationOpen(false); openLive('situation', { scenario }); }} />}
-        {!onboarded && <Onboarding onDone={(mode) => { if (mode) openLive(mode); }} />}
+        {!onboarded && <Onboarding onDone={() => { setLiveOpen(false); setSituationOpen(false); setView('home'); }} />}
       </div>
     </div>
   );
