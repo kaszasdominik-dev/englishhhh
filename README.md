@@ -2,7 +2,15 @@
 
 ## Helyi fejlesztői környezet
 
-A backendhez MongoDB és Python, a frontendhez Node/Yarn szükséges.
+A backendhez MongoDB és Python, a frontendhez Node.js szükséges. A projekt UTF-8 forrásfájlokat használ.
+
+Windows alatt a legegyszerűbb indítás a repo gyökeréből:
+
+```powershell
+.\start-local.cmd
+```
+
+Ez külön terminálban indítja a backendet és a frontendet.
 
 ### Backend .env
 
@@ -53,19 +61,31 @@ A CEFR-sáv gyakorisági becslés, nem hivatalos CEFR-minősítés.
 
 ### Frontend
 
-Hozd létre a `frontend/.env` fájlt:
+Helyi fejlesztéskor a frontend `.env` nélkül is a `http://localhost:8000` backendet használja. Ha külön backend címet szeretnél, hozd létre a `frontend/.env` fájlt:
 
 ```env
 REACT_APP_BACKEND_URL=http://localhost:8000
 ```
 
-Majd:
+Telepítés és indítás Yarnnal:
 
 ```powershell
 cd frontend
-yarn install
-yarn start
+yarn.cmd install
+yarn.cmd start
 ```
+
+Vagy npm-mel:
+
+```powershell
+cd frontend
+npm.cmd install
+npm.cmd start
+```
+
+A `.cmd` forma PowerShellben akkor is működik, ha a helyi execution policy blokkolja az `npm.ps1` / `yarn.ps1` fájlokat.
+
+Éles, egy domainen futó telepítésnél a frontend automatikusan a saját origin `/api` végpontját használja. Külön frontend/backend domaineknél állítsd be a `REACT_APP_BACKEND_URL` és a backend `CORS_ORIGINS` értékét.
 
 A szógyakorló modern böngészőn alapból a készülék/Web Speech angol hangját használja, ezért a normál szógyakorlás hangja sem igényel OpenAI API-hívást.
 
