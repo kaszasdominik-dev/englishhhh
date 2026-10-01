@@ -534,7 +534,16 @@ async def live_session(request: Request):
                 payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business'),
                                    'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
             return JSONResponse(payload, status_code=r.status_code)
-        return Response(content=r.text, status_code=r.status_code, media_type=ct or 'application/json')
+        if r.status_code < 400:
+            # Defensive compatibility: keep our browser contract JSON even if an upstream/proxy
+            # returns the WebRTC answer as raw SDP.
+            return JSONResponse({
+                'transport': {'type': 'webrtc', 'sdp': r.text},
+                'livo': {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business'),
+                         'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
+            }, status_code=r.status_code)
+        return JSONResponse({'error': (r.text or f'Live upstream error {r.status_code}')[:1000], 'code': 'LIVE_UPSTREAM_ERROR'},
+                            status_code=r.status_code)
     except Exception as e:
         logger.error("live-session error %s", e)
         return JSONResponse({"error": "Could not create OpenAI Live session."}, status_code=502)
