@@ -27,9 +27,13 @@ def main():
     subprocess.run([sys.executable, str(BACKEND_DIR / "scripts" / "import_freedict_dictionary.py")], cwd=str(BACKEND_DIR), check=True)
 
     print("\n2/2 10 000 kerdeses bank import...")
-    mongo_url = os.environ["MONGO_URL"]
-    db_name = os.environ["DB_NAME"]
-    client = MongoClient(mongo_url)
+    mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+    db_name = os.environ.get("DB_NAME", "livo")
+    client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
+    try:
+        client.admin.command("ping")
+    except Exception as exc:
+        raise SystemExit(f"Nem elérhető a MongoDB ({mongo_url}). Indítsd el a MongoDB szolgáltatást, majd próbáld újra. Részlet: {exc}")
     db = client[db_name]
     col = db.question_bank
     rows = generate_question_bank()
