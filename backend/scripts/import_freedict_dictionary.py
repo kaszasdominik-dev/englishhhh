@@ -58,14 +58,18 @@ def download_source():
     return path
 
 def main():
-    mongo_url, db_name = os.environ.get('MONGO_URL'), os.environ.get('DB_NAME')
-    if not mongo_url or not db_name:
-        raise SystemExit('Hiányzik a MONGO_URL vagy DB_NAME a backend/.env fájlból.')
+    mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+    db_name = os.environ.get('DB_NAME', 'livo')
     if zipf_frequency is None:
         print('FIGYELEM: wordfreq nincs telepítve. Telepítés: pip install wordfreq')
 
     path = download_source()
-    db = MongoClient(mongo_url)[db_name]
+    client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
+    try:
+        client.admin.command('ping')
+    except Exception as exc:
+        raise SystemExit(f'Nem elérhető a MongoDB ({mongo_url}). Indítsd el a MongoDB szolgáltatást, majd próbáld újra. Részlet: {exc}')
+    db = client[db_name]
     col = db.dictionary
     col.delete_many({'source': 'freedict-eng-hun'})
     batch, seen, total, eligible = [], set(), 0, 0
@@ -149,6 +153,8 @@ def main():
     finally:
         try: os.remove(path)
         except OSError: pass
+        try: client.close()
+        except Exception: pass
 
 if __name__ == '__main__':
     main()
