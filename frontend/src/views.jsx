@@ -41,7 +41,7 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
             {due.length ? `Érdemes visszahozni: ${due.map(x => x.term).join(', ')}.` : 'Folytasd onnan, ahol legutóbb abbahagytátok.'}
           </p>
           <div className="mt-5 flex items-center gap-3">
-            <button data-testid="home-start-btn" onClick={() => openLive('business')} className="inline-flex items-center gap-2 rounded-full bg-white text-ink font-semibold text-sm px-5 py-3 active:scale-95 transition-transform shadow-soft">
+            <button data-testid="home-start-btn" onClick={() => openLive('free')} className="inline-flex items-center gap-2 rounded-full bg-white text-ink font-semibold text-sm px-5 py-3 active:scale-95 transition-transform shadow-soft">
               Beszélj {t.name}-szel <ArrowRight size={16} />
             </button>
             <button onClick={() => goto('practice')} className="text-sm font-semibold text-slate-300 active:text-white">Másik mód</button>
