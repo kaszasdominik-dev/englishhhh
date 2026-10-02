@@ -238,7 +238,31 @@ async def openai_responses(prompt, developer, schema_name, schema, timeout=20):
         if r.status_code >= 400:
             logger.error("responses %s %s", r.status_code, raw[:400])
             raise RuntimeError(f"responses {r.status_code}")
-        return json.loads(extract_output_text(json.loads(raw)))
+
+        payload = r.json()
+        usage = payload.get('usage') or {}
+        try:
+            safe_name = re.sub(r'[^a-zA-Z0-9_]+', '_', schema_name)[:64] or 'unknown'
+            await db.usage_totals.update_one(
+                {'_id': current_client_id()},
+                {
+                    '$inc': {
+                        'responses.inputTokens': int(usage.get('input_tokens') or 0),
+                        'responses.cachedInputTokens': int((usage.get('input_tokens_details') or {}).get('cached_tokens') or 0),
+                        'responses.outputTokens': int(usage.get('output_tokens') or 0),
+                        'responses.reasoningTokens': int((usage.get('output_tokens_details') or {}).get('reasoning_tokens') or 0),
+                        f'responses.byOperation.{safe_name}.calls': 1,
+                        f'responses.byOperation.{safe_name}.inputTokens': int(usage.get('input_tokens') or 0),
+                        f'responses.byOperation.{safe_name}.outputTokens': int(usage.get('output_tokens') or 0),
+                    },
+                    '$set': {'updatedAt': now_iso(), 'reasoningModel': REASONING_MODEL},
+                },
+                upsert=True,
+            )
+        except Exception as usage_error:
+            logger.warning("usage telemetry failed %s", usage_error)
+
+        return json.loads(extract_output_text(payload))
 
 # ------------------------------------------------------------------ vocab hygiene
 GEN_BLOCK = set("a an the and or but to of for in on at with from this that these those it its i you he she we they my your our their am is are was were be been being do does did have has had can could will would shall should may might must".split())
@@ -1333,6 +1357,27 @@ async def analyze_session(request: Request):
     state = await load_state()
     transcript = [x for x in (body.get('transcript') or []) if x and x.get('text')][-240:]
     duration = int(body.get('durationSeconds') or 0)
+    live_usage_seconds = max(0, int(body.get('liveUsageSeconds') or 0))
+    delegated = body.get('delegatedUsage') if isinstance(body.get('delegatedUsage'), dict) else {}
+    try:
+        await db.usage_totals.update_one(
+            {'_id': current_client_id()},
+            {
+                '$inc': {
+                    'live.seconds': live_usage_seconds,
+                    'live.sessions': 1,
+                    'live.delegatedInputTokens': max(0, int(delegated.get('inputTokens') or 0)),
+                    'live.delegatedCachedInputTokens': max(0, int(delegated.get('cachedInputTokens') or 0)),
+                    'live.delegatedOutputTokens': max(0, int(delegated.get('outputTokens') or 0)),
+                    'live.delegatedReasoningTokens': max(0, int(delegated.get('reasoningTokens') or 0)),
+                },
+                '$set': {'updatedAt': now_iso(), 'liveModel': LIVE_MODEL, 'reasoningModel': REASONING_MODEL},
+            },
+            upsert=True,
+        )
+    except Exception as usage_error:
+        logger.warning("live usage telemetry failed %s", usage_error)
+
     baseline = set(k for k in (norm_vocab_key(x) for x in (body.get('baselineVocabulary') or [])) if k)
     result = None
     if OPENAI_API_KEY and transcript:
@@ -1365,7 +1410,7 @@ Duration seconds: {duration}
 Transcript JSON: {json.dumps(transcript)}
 Analyse ONLY this session. If this is a scenario session, judge whether the learner communicated successfully in the real-life situation, then identify the most useful concrete English mistakes or missing phrases to practise. Preserve the learner exact wording in correction.original. Do not invent errors. Hungarian explanations preferred. For vocabulary: ONLY genuinely useful English words/phrases that appear in THIS transcript and were NOT in the baseline. Update mastery cautiously (delta -6..+8). Homework 3\u201310 minutes based on this session."""
         try:
-            result = await openai_responses(prompt, 'You are LIVO lesson analyst. Return rigorous structured learning data, not generic praise.', 'livo_session_analysis', schema, timeout=12)
+            result = await openai_responses(prompt, 'You are LIVO lesson analyst. Return rigorous structured learning data, not generic praise.', 'livo_session_analysis', schema, timeout=25)
         except Exception as e:
             logger.error("analysis fallback %s", e)
             result = fallback_analysis(transcript, duration)
