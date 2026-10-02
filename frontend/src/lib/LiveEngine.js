@@ -54,6 +54,8 @@ export class LiveEngine {
     this.situationFrustration = 0; this.situationTurnCount = 0; this.situationFinished = false;
     this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false; this.situationFinishAfterResponse = false;
     this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null; this._transportSeq = 0;
+    this.delegatedUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0 };
+    this._delegatedResponseIds = new Set();
     this.diag = [];
   }
 
@@ -344,6 +346,21 @@ export class LiveEngine {
     let d; try { d = JSON.parse(msg.data); } catch { return; }
     const type = d.type || d?.response?.event?.type || '';
     const ev = d?.response?.event || d;
+
+    // GPT-Live Responses delegation is billed separately. Nested response.completed
+    // events contain backend token usage; count each response id exactly once.
+    if (type === 'response.completed' && ev?.response?.usage) {
+      const responseId = ev.response.id || d?.response_id || '';
+      if (!responseId || !this._delegatedResponseIds.has(responseId)) {
+        if (responseId) this._delegatedResponseIds.add(responseId);
+        const usage = ev.response.usage || {};
+        this.delegatedUsage.inputTokens += Number(usage.input_tokens || 0);
+        this.delegatedUsage.cachedInputTokens += Number(usage.input_tokens_details?.cached_tokens || 0);
+        this.delegatedUsage.outputTokens += Number(usage.output_tokens || 0);
+        this.delegatedUsage.reasoningTokens += Number(usage.output_tokens_details?.reasoning_tokens || 0);
+      }
+    }
+
     if (type === 'session.started') this.markConnected();
     const speechStarted = type.includes('input') && type.includes('speech') && type.includes('started');
     const speechStopped = type.includes('input') && type.includes('speech') && type.includes('stopped');
@@ -1268,7 +1285,7 @@ export class LiveEngine {
     this.notify();
     const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 30000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, liveUsageSeconds: Math.max(0, Math.round(this.usageSeconds || 0)), transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(readJsonResponse);
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, liveUsageSeconds: Math.max(0, Math.round(this.usageSeconds || 0)), delegatedUsage: this.delegatedUsage, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(readJsonResponse);
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
       this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
