@@ -1,4 +1,5 @@
-import os, json, re, time, random, logging
+import os, json, re, time, random, logging, uuid
+from contextvars import ContextVar
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -20,7 +21,7 @@ logger = logging.getLogger("livo")
 
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'livo')
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
 db = client[db_name]
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -31,6 +32,26 @@ TTS_MODEL = os.environ.get('OPENAI_TTS_MODEL', 'gpt-4o-mini-tts')
 
 app = FastAPI()
 api = APIRouter(prefix="/api")
+
+_client_id_ctx = ContextVar("livo_client_id", default="demo-user")
+
+def current_client_id():
+    value = str(_client_id_ctx.get() or "demo-user")
+    return value if re.match(r"^[A-Za-z0-9_-]{8,80}$", value) else "demo-user"
+
+@app.middleware("http")
+async def bind_client_context(request: Request, call_next):
+    raw = str(request.headers.get("X-Livo-Client") or "demo-user").strip()
+    client_id = raw if re.match(r"^[A-Za-z0-9_-]{8,80}$", raw) else "demo-user"
+    token = _client_id_ctx.set(client_id)
+    try:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), geolocation=()"
+        return response
+    finally:
+        _client_id_ctx.reset(token)
 
 # ------------------------------------------------------------------ personas
 teachers = {
@@ -78,10 +99,11 @@ def now_iso():
 # ------------------------------------------------------------------ state (mongo)
 async def load_state():
     seed = json.loads((ROOT_DIR / 'seed_state.json').read_text(encoding='utf-8'))
-    doc = await db.livo_state.find_one({"_id": "demo-user"})
+    state_id = f"state:{current_client_id()}"
+    doc = await db.livo_state.find_one({"_id": state_id})
     if not doc:
-        seed['_id'] = 'demo-user'
-        await db.livo_state.replace_one({"_id": "demo-user"}, seed, upsert=True)
+        seed['_id'] = state_id
+        await db.livo_state.replace_one({"_id": state_id}, seed, upsert=True)
         return seed
 
     # Backward-compatible state migration: older local Mongo documents may miss
@@ -98,12 +120,13 @@ async def load_state():
                     doc[key][subkey] = json.loads(json.dumps(subdefault))
                     changed = True
     if changed:
-        await db.livo_state.replace_one({"_id": "demo-user"}, doc, upsert=True)
+        await db.livo_state.replace_one({"_id": state_id}, doc, upsert=True)
     return doc
 
 async def save_state(state):
-    state['_id'] = 'demo-user'
-    await db.livo_state.replace_one({"_id": "demo-user"}, state, upsert=True)
+    state_id = f"state:{current_client_id()}"
+    state['_id'] = state_id
+    await db.livo_state.replace_one({"_id": state_id}, state, upsert=True)
 
 def public_state(state):
     return {k: v for k, v in state.items() if k != '_id'}
@@ -479,8 +502,13 @@ Only when the learner explicitly ends the lesson OR LIVO sends TIME LIMIT REACHE
 # ------------------------------------------------------------------ routes
 @api.get("/health")
 async def health():
-    return {"ok": True, "openaiConfigured": bool(OPENAI_API_KEY), "liveModel": LIVE_MODEL,
-            "analysisModel": REASONING_MODEL, "appVersion": "5.0", "pexelsConfigured": bool(PEXELS_API_KEY)}
+    db_ok = True
+    try:
+        await db.command("ping")
+    except Exception:
+        db_ok = False
+    return {"ok": db_ok, "database": db_ok, "openaiConfigured": bool(OPENAI_API_KEY), "liveModel": LIVE_MODEL,
+            "analysisModel": REASONING_MODEL, "appVersion": "5.1", "pexelsConfigured": bool(PEXELS_API_KEY)}
 
 @api.get("/bootstrap")
 async def bootstrap():
@@ -1417,9 +1445,18 @@ async def rtc_config():
     return {"iceServers": ice, "turn": False}
 
 app.include_router(api)
-app.add_middleware(CORSMiddleware, allow_credentials=True,
-                   allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-                   allow_methods=["*"], allow_headers=["*"])
+cors_origins = [x.strip() for x in os.environ.get(
+    'CORS_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000'
+).split(',') if x.strip()]
+allow_all_origins = '*' in cors_origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=not allow_all_origins,
+    allow_origins=['*'] if allow_all_origins else cors_origins,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Livo-Client"],
+)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
