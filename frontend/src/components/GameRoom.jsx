@@ -102,7 +102,8 @@ function Quick({ words, round, setRound, correct, wrong, hearts, total, setDone,
     if (locked) return; setLocked(true); setPicked(o);
     const ok = norm(o) === norm(target[field]);
     if (ok) { correct(); setFeedback({ kind: 'good', text: `Igen · ${target.term} = ${target.meaning}` }); } else { wrong(); setFeedback({ kind: 'bad', text: `Nem · ${target.term} = ${target.meaning}` }); }
-    setTimeout(() => { if (hearts > 0 || ok) setRound(r => r + 1); }, 800);
+    const canContinue = ok || hearts > 1;
+    setTimeout(() => { if (canContinue) setRound(r => r + 1); }, 800);
   };
   return (
     <div>
@@ -139,7 +140,8 @@ function Swipe({ words, round, setRound, correct, wrong, hearts, total, setDone,
     setResult(ok ? 'good' : 'bad');
     animate(x, side === 'left' ? -260 : 260, { duration: 0.28, ease: 'easeIn' });
     if (ok) { correct(); setFeedback({ kind: 'good', text: `✓ ${target.term} = ${target.meaning}` }); } else { wrong(); setFeedback({ kind: 'bad', text: `✕ ${target.term} = ${target.meaning}` }); }
-    setTimeout(() => { if (hearts > 0 || ok) setRound(r => r + 1); }, 620);
+    const canContinue = ok || hearts > 1;
+    setTimeout(() => { if (canContinue) setRound(r => r + 1); }, 620);
   };
   const onDragEnd = (e, info) => {
     if (locked) return;
@@ -256,7 +258,8 @@ function ImageGame({ words, round, setRound, correct, wrong, hearts, total, setD
     if (locked) return; setLocked(true); setPicked(o);
     const ok = norm(o) === norm(target.term);
     if (ok) { correct(); setFeedback({ kind: 'good', text: `${target.term} = ${target.meaning}` }); } else { wrong(); setFeedback({ kind: 'bad', text: `Nem · ${target.term} = ${target.meaning}` }); }
-    setTimeout(() => { if (hearts > 0 || ok) setRound(r => r + 1); }, 800);
+    const canContinue = ok || hearts > 1;
+    setTimeout(() => { if (canContinue) setRound(r => r + 1); }, 800);
   };
   return (
     <div>
