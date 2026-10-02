@@ -39,12 +39,43 @@ def current_client_id():
     value = str(_client_id_ctx.get() or "demo-user")
     return value if re.match(r"^[A-Za-z0-9_-]{8,80}$", value) else "demo-user"
 
+_rate_events = {}
+
+def _route_rate_limit(path):
+    if path.endswith('/live-session'): return (8, 60)
+    if path.endswith('/session/analyze'): return (8, 60)
+    if '/scenario/' in path: return (90, 60)
+    if path.endswith('/turn-check') or path.endswith('/task-eval'): return (120, 60)
+    if path.endswith('/pronunciation-help') or path.endswith('/voice-preview') or path.endswith('/pronounce'): return (60, 60)
+    return None
+
 @app.middleware("http")
 async def bind_client_context(request: Request, call_next):
     raw = str(request.headers.get("X-Livo-Client") or "demo-user").strip()
     client_id = raw if re.match(r"^[A-Za-z0-9_-]{8,80}$", raw) else "demo-user"
     token = _client_id_ctx.set(client_id)
     try:
+        limit = _route_rate_limit(request.url.path)
+        if limit and request.method != 'OPTIONS':
+            max_calls, window = limit
+            now = time.monotonic()
+            key = (client_id, request.url.path)
+            recent = [t for t in _rate_events.get(key, []) if now - t < window]
+            if len(recent) >= max_calls:
+                return JSONResponse(
+                    {"error": "Túl sok kérés érkezett rövid idő alatt. Várj egy kicsit, majd próbáld újra.", "code": "RATE_LIMITED"},
+                    status_code=429,
+                    headers={"Retry-After": "10"},
+                )
+            recent.append(now)
+            _rate_events[key] = recent
+            if len(_rate_events) > 5000:
+                cutoff = now - 120
+                for k in list(_rate_events.keys()):
+                    kept = [t for t in _rate_events[k] if t >= cutoff]
+                    if kept: _rate_events[k] = kept
+                    else: _rate_events.pop(k, None)
+
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -334,7 +365,7 @@ def dictionary_progress_entry(state, dictionary_id, term=''):
 # ------------------------------------------------------------------ tutor prompt
 def tutor_prompt(teacher, mode, profile, memory, learner_name, duration, language_mode, pace, language_mix='mixed', scenario=None):
     t = teachers.get(teacher, teachers['maya'])
-    m = modes.get(mode, modes['business'])
+    m = modes.get(mode, modes['free'])
     raw_level = str(profile.get('cefr', 'B1') or 'B1').upper()
     level = next((x for x in ('A1', 'A2', 'B1', 'B2', 'C1') if raw_level.startswith(x)), 'B1')
     hu = profile.get('huHelp', 'on_request')
@@ -543,7 +574,7 @@ async def live_session(request: Request):
     merged_profile = {**profile, **(body.get('profile') or {})}
     session = {
         'model': LIVE_MODEL,
-        'instructions': tutor_prompt(teacher, body.get('mode', 'business'), merged_profile, memory,
+        'instructions': tutor_prompt(teacher, body.get('mode', 'free'), merged_profile, memory,
                                      state.get('user', {}).get('name', ''), duration, lang, pace, language_mix, scenario),
         'audio': {'output': {'voice': t['voice']}},
         'delegation': {'type': 'responses', 'responses': {
@@ -560,7 +591,7 @@ async def live_session(request: Request):
         if 'json' in ct:
             payload = r.json()
             if r.status_code < 400:
-                payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business'),
+                payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'free'),
                                    'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
             return JSONResponse(payload, status_code=r.status_code)
         if r.status_code < 400:
@@ -568,7 +599,7 @@ async def live_session(request: Request):
             # returns the WebRTC answer as raw SDP.
             return JSONResponse({
                 'transport': {'type': 'webrtc', 'sdp': r.text},
-                'livo': {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'business'),
+                'livo': {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'free'),
                          'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
             }, status_code=r.status_code)
         return JSONResponse({'error': (r.text or f'Live upstream error {r.status_code}')[:1000], 'code': 'LIVE_UPSTREAM_ERROR'},
@@ -1268,7 +1299,7 @@ async def analyze_session(request: Request):
         prompt = f"""Learner profile: {json.dumps(state.get('profile', {}))}
 Vocabulary that ALREADY existed before this session (EXCLUDE from vocabulary output): {json.dumps(list(baseline))}
 Existing grammar patterns: {json.dumps(state.get('grammar', []))}
-Session mode: {body.get('mode', 'business')}
+Session mode: {body.get('mode', 'free')}
 Scenario id: {body.get('scenarioId') or ''}
 Role-play controller observations (use ONLY when supported by the transcript): {json.dumps((body.get('observedMistakes') or [])[:20])}
 Duration seconds: {duration}
@@ -1306,7 +1337,7 @@ Analyse ONLY this session. If this is a scenario session, judge whether the lear
             if g:
                 g['mastery'] = clamp(g.get('mastery', 50) + clamp(int(u.get('delta') or 0), -8, 8), 0, 100)
                 g['count'] = g.get('count', 0) + 1
-    session = {"id": f"s_{int(time.time()*1000)}", "createdAt": now_iso(), "mode": body.get('mode', 'business'),
+    session = {"id": f"s_{int(time.time()*1000)}", "createdAt": now_iso(), "mode": body.get('mode', 'free'),
                "teacher": body.get('teacher') or state.get('profile', {}).get('teacher'), "durationSeconds": duration,
                "scenarioId": body.get('scenarioId') or '',
                "transcript": transcript, "summary": result}
