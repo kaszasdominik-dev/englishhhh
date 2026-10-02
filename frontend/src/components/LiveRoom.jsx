@@ -1,5 +1,6 @@
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
 import { X, Mic, MicOff, Play, RotateCcw, Pause, Volume2, Check, ArrowRight, Sparkles, ScrollText, Bookmark, Lightbulb, Languages, HelpCircle } from 'lucide-react';
 
@@ -343,13 +344,10 @@ function TaskCard({ s, engine }) {
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
             className={`relative mt-4 rounded-[1.75rem] p-6 text-center transition-colors duration-300 ${tone}`}>
             {st === 'correct' ? (
-              <motion.div data-testid="task-success" initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 380, damping: 15 }}>
-                <motion.span initial={{ scale: 0 }} animate={{ scale: [0, 1.25, 1] }} transition={{ duration: 0.45 }} className="mx-auto h-11 w-11 rounded-full bg-emerald-500 grid place-items-center">
-                  <Check size={22} />
-                </motion.span>
-                <div className="mt-2.5 text-2xl font-heading font-extrabold text-emerald-300">{pt.matched || englishTarget || pt.text}</div>
-                <div className="text-xs text-emerald-200/80 mt-1">{pt.reason || 'Szép! Megvan.'}</div>
-              </motion.div>
+              <TaskSuccessCelebration
+                answer={pt.matched || englishTarget || pt.text}
+                reason={pt.reason || 'Szép! Megvan.'}
+              />
             ) : (
               <>
                 <button data-testid="task-close" onClick={() => engine.hidePracticeTarget()} className="absolute top-4 right-4 h-6 w-6 grid place-items-center rounded-full bg-white/10 text-slate-400"><X size={13} /></button>
@@ -407,6 +405,61 @@ function TaskCard({ s, engine }) {
         );
       })()}
     </AnimatePresence>
+  );
+}
+
+function TaskSuccessCelebration({ answer, reason }) {
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const base = { particleCount: 55, spread: 68, startVelocity: 26, gravity: 0.9, scalar: 0.8, origin: { y: 0.62 } };
+    try {
+      confetti({ ...base, origin: { x: 0.35, y: 0.62 } });
+      confetti({ ...base, origin: { x: 0.65, y: 0.62 } });
+    } catch { /* visual bonus only */ }
+  }, []);
+
+  return (
+    <motion.div
+      data-testid="task-success"
+      initial={{ opacity: 0, scale: 0.88 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+      className="relative overflow-hidden rounded-[1.5rem] bg-emerald-500/10 px-4 py-5"
+    >
+      <motion.div
+        aria-hidden="true"
+        className="absolute left-1/2 top-[74px] h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-300/20"
+        initial={{ scale: 0.55, opacity: 0.8 }}
+        animate={{ scale: [0.55, 1.35, 1.55], opacity: [0.75, 0.2, 0] }}
+        transition={{ duration: 1.05, ease: 'easeOut' }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute left-1/2 top-[74px] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/20 blur-xl"
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: [0.5, 1.25, 1], opacity: [0, 0.8, 0.35] }}
+        transition={{ duration: 0.7 }}
+      />
+      <motion.div
+        initial={{ scale: 0, rotate: -18 }}
+        animate={{ scale: [0, 1.2, 0.96, 1], rotate: [-18, 5, 0, 0] }}
+        transition={{ duration: 0.58, times: [0, 0.55, 0.8, 1] }}
+        className="relative mx-auto h-24 w-24 rounded-full bg-emerald-500 text-white grid place-items-center shadow-lg ring-8 ring-emerald-400/15"
+      >
+        <Check size={54} strokeWidth={3.4} />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="relative mt-4"
+      >
+        <div className="text-[11px] tracking-[0.32em] font-black text-emerald-300">HELYES!</div>
+        <div className="mt-1 text-2xl font-heading font-extrabold text-white break-words">{answer}</div>
+        <div className="text-sm font-semibold text-emerald-200/90 mt-1.5">{reason}</div>
+      </motion.div>
+    </motion.div>
   );
 }
 
