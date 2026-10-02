@@ -177,9 +177,12 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
     ? data.profile.liveLanguageMix
     : 'hungarian';
   const [languageMix, setLanguageMix] = useState(initialMix);
-  const setLanguage = (value) => {
+  const setLanguage = async (value) => {
+    if (value === languageMix) return;
+    const previous = languageMix;
     setLanguageMix(value);
-    saveProfile?.({ profile: { liveLanguageMix: value } });
+    const saved = await saveProfile?.({ profile: { liveLanguageMix: value } });
+    if (!saved) setLanguageMix(previous);
   };
   const liveModes = Object.values(MODES).filter(m => m.id !== 'vocabulary');
 
