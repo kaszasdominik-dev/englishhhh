@@ -2,6 +2,7 @@ import os, json, re, time, random, logging, uuid
 from contextvars import ContextVar
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, APIRouter, Request, Response
@@ -128,11 +129,39 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 # ------------------------------------------------------------------ state (mongo)
+def _user_zone(state):
+    name = str((state.get('user') or {}).get('timezone') or 'UTC')
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return timezone.utc
+
+def _week_snapshot(state):
+    tz = _user_zone(state)
+    now = datetime.now(tz)
+    monday = (now - timedelta(days=now.weekday())).date()
+    minutes = 0
+    days = set()
+    for session in state.get('sessions') or []:
+        try:
+            created = datetime.fromisoformat(str(session.get('createdAt') or '').replace('Z', '+00:00'))
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            local_day = created.astimezone(tz).date()
+        except Exception:
+            continue
+        if monday <= local_day <= now.date():
+            minutes += max(1, -(-int(session.get('durationSeconds') or 0) // 60))
+            days.add(local_day.isoformat())
+    return monday.isoformat(), minutes, len(days)
+
 async def load_state():
     seed = json.loads((ROOT_DIR / 'seed_state.json').read_text(encoding='utf-8'))
     state_id = f"state:{current_client_id()}"
     doc = await db.livo_state.find_one({"_id": state_id})
     if not doc:
+        week_key, week_minutes, week_days = _week_snapshot(seed)
+        seed.setdefault('stats', {}).update({'weekKey': week_key, 'weekMinutes': week_minutes, 'weekDays': week_days})
         seed['_id'] = state_id
         await db.livo_state.replace_one({"_id": state_id}, seed, upsert=True)
         return seed
@@ -150,6 +179,13 @@ async def load_state():
                 if subkey not in doc[key] or doc[key].get(subkey) is None:
                     doc[key][subkey] = json.loads(json.dumps(subdefault))
                     changed = True
+    week_key, week_minutes, week_days = _week_snapshot(doc)
+    stats = doc.setdefault('stats', {})
+    if stats.get('weekKey') != week_key or int(stats.get('weekMinutes') or 0) != week_minutes or int(stats.get('weekDays') or 0) != week_days:
+        stats['weekKey'] = week_key
+        stats['weekMinutes'] = week_minutes
+        stats['weekDays'] = week_days
+        changed = True
     if changed:
         await db.livo_state.replace_one({"_id": state_id}, doc, upsert=True)
     return doc
