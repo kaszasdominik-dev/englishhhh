@@ -6,12 +6,17 @@ import { toast } from 'sonner';
 
 export function TeacherSheet({ engine, liveOpen, onClose }) {
   const { data, saveProfile, previewTeacher } = useStore();
-  const [draft, setDraft] = useState(data.profile.teacher || 'maya');
+  const [draft, setDraft] = useState(data?.profile?.teacher || 'maya');
   const confirm = async () => {
     onClose();
-    if (liveOpen && engine?.connected) { engine.setTeacher(draft); }
-    await saveProfile({ profile: { teacher: draft } });
-    toast.success(`${TEACHERS[draft].name} lett a tanárod.`);
+    // The realtime voice is fixed when a Live session is created. Changing only the
+    // avatar/name mid-session would make the UI disagree with the voice, so apply it
+    // immediately only before connection; otherwise from the next lesson.
+    if (liveOpen && !engine?.connected) engine?.setTeacher?.(draft);
+    const saved = await saveProfile({ profile: { teacher: draft } });
+    if (!saved) return;
+    if (liveOpen && engine?.connected) toast.success(`${TEACHERS[draft].name} a következő órától lesz a tanárod.`);
+    else toast.success(`${TEACHERS[draft].name} lett a tanárod.`);
   };
   return (
     <div className="absolute inset-0 z-50 flex items-end" data-testid="teacher-sheet">
@@ -29,13 +34,13 @@ export function TeacherSheet({ engine, liveOpen, onClose }) {
           {TEACHER_IDS.map(id => {
             const t = TEACHERS[id]; const sel = draft === id;
             return (
-              <div role="button" tabIndex={0} key={id} data-testid={`teacher-pick-${id}`} onClick={() => setDraft(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
+              <button type="button" key={id} data-testid={`teacher-pick-${id}`} onClick={() => setDraft(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
                 {sel && <span className="absolute top-2 right-2 h-5 w-5 rounded-full bg-brand text-white grid place-items-center"><Check size={12} /></span>}
                 <img alt={t.name} src={t.img} className="h-14 w-14 rounded-2xl object-cover bg-slate-100" />
                 <div className="mt-2 font-heading font-bold text-ink">{t.name}</div>
                 <div className="text-[11px] text-ink-mute leading-tight">{t.accent} · {t.desc}</div>
-                <button onClick={(e) => { e.stopPropagation(); previewTeacher(id); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><Play size={11} /> Hangminta</button>
-              </div>
+                <span onClick={(e) => { e.stopPropagation(); previewTeacher(id); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><Play size={11} /> Hangminta</span>
+              </button>
             );
           })}
         </div>
