@@ -61,6 +61,34 @@ function Root() {
   }
   const engine = engineRef.current;
   if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') window.__livoEngine = engine;
+
+  // Do not keep a paid Live session running invisibly in a background tab/app.
+  // Returning to the app shows the normal pause overlay and lets the learner resume.
+  useEffect(() => {
+    if (!liveOpen) return undefined;
+    const onVisibility = () => {
+      const snap = engine.getSnapshot?.();
+      if (document.hidden && snap?.connected && !snap?.autoPaused) engine.autoPause?.('background');
+    };
+    const onPageHide = () => {
+      try { engine.hardCleanup?.(true); } catch {}
+    };
+    const onBeforeUnload = (event) => {
+      const snap = engine.getSnapshot?.();
+      if (!snap?.connected) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [engine, liveOpen]);
+
   // keep callbacks fresh
   useEffect(() => {
     engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: p?.quiet === true });
