@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Component, useEffect, useRef, useState } from 'react';
 import '@/App.css';
 import { StoreProvider, useStore } from '@/lib/store';
 import { LiveEngine } from '@/lib/LiveEngine';
@@ -21,8 +21,24 @@ const NAV = [
   { id: 'profile', label: 'Profil', icon: User },
 ];
 
+function useOnlineStatus() {
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  return online;
+}
+
 function Root() {
   const store = useStore();
+  const online = useOnlineStatus();
   const { data, ready, error, retryBootstrap } = store;
   const [view, setView] = useState('home');
   const [teacherSheet, setTeacherSheet] = useState(false);
@@ -75,6 +91,11 @@ function Root() {
     <div className="min-h-screen w-full flex items-stretch justify-center bg-[#E8ECF4] p-0 sm:p-6">
       <div data-testid="app-shell" className="relative w-full max-w-md bg-background sm:rounded-[2.5rem] sm:shadow-phone sm:ring-1 sm:ring-slate-200/70 overflow-hidden min-h-screen sm:min-h-0 sm:h-[calc(100vh-3rem)] flex flex-col">
         <TopBar view={view} data={data} onSettings={() => setView('profile')} onTeacher={() => setTeacherSheet(true)} />
+        {!online && (
+          <div role="status" className="z-20 mx-4 mt-2 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+            Nincs internetkapcsolat · a helyi gyakorlók működhetnek, a Live és a mentés átmenetileg nem.
+          </div>
+        )}
         <main className="livo-scroll flex-1 overflow-y-auto overflow-x-hidden pb-28">
           {view === 'home' && <HomeView data={data} openLive={openLive} goto={setView} onTeacher={() => setTeacherSheet(true)} />}
           {view === 'practice' && <PracticeView data={data} openLive={openLive} onTeacher={() => setTeacherSheet(true)} onSituation={() => setSituationOpen(true)} />}
@@ -168,10 +189,40 @@ function BootScreen({ error, onRetry }) {
   );
 }
 
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[LIVO] UI crash', error, info);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="min-h-screen grid place-items-center bg-[#E8ECF4] p-6 text-center">
+        <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-200">
+          <div className="mx-auto h-14 w-14 rounded-3xl bg-rose-500 text-white grid place-items-center font-heading font-extrabold text-2xl">!</div>
+          <h1 className="mt-4 font-heading text-xl font-extrabold text-ink">Valami megakadt.</h1>
+          <p className="mt-2 text-sm text-ink-mute">A tanulási adataid nem vesznek el. Töltsd újra az alkalmazást, és próbáld újra.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-5 w-full rounded-full bg-brand px-5 py-3 text-sm font-semibold text-white">
+            Újratöltés
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 export default function App() {
   return (
-    <StoreProvider>
-      <Root />
-    </StoreProvider>
+    <AppErrorBoundary>
+      <StoreProvider>
+        <Root />
+      </StoreProvider>
+    </AppErrorBoundary>
   );
 }
