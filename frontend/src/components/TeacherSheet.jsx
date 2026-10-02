@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TeacherAvatar } from '@/components/TeacherAvatar';
 import { useStore } from '@/lib/store';
 import { TEACHERS, TEACHER_IDS } from '@/lib/livo';
 import { X, Play, Check } from 'lucide-react';
@@ -36,7 +37,7 @@ export function TeacherSheet({ engine, liveOpen, onClose }) {
             return (
               <button type="button" key={id} data-testid={`teacher-pick-${id}`} onClick={() => setDraft(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
                 {sel && <span className="absolute top-2 right-2 h-5 w-5 rounded-full bg-brand text-white grid place-items-center"><Check size={12} /></span>}
-                <img alt={t.name} src={t.img} className="h-14 w-14 rounded-2xl object-cover bg-slate-100" />
+                <TeacherAvatar teacher={t} className="h-14 w-14 rounded-2xl" />
                 <div className="mt-2 font-heading font-bold text-ink">{t.name}</div>
                 <div className="text-[11px] text-ink-mute leading-tight">{t.accent} · {t.desc}</div>
                 <span onClick={(e) => { e.stopPropagation(); previewTeacher(id); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><Play size={11} /> Hangminta</span>
