@@ -36,9 +36,15 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand/40 blur-3xl" />
         <div className="relative">
           <span className="text-[10px] tracking-[0.22em] font-bold text-brand-ring">FOLYTASD INNEN</span>
-          <h2 className="font-heading font-extrabold text-2xl leading-tight mt-2">{t.name} emlékszik, hol tartottatok.</h2>
+          <h2 className="font-heading font-extrabold text-2xl leading-tight mt-2">
+            {(data?.sessions || []).length ? `${t.name} emlékszik, hol tartottatok.` : `Kezdd el az első órád ${t.name} tanárral.`}
+          </h2>
           <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-            {due.length ? `Érdemes visszahozni: ${due.map(x => x.term).join(', ')}.` : 'Folytasd onnan, ahol legutóbb abbahagytátok.'}
+            {due.length
+              ? `Érdemes visszahozni: ${due.map(x => x.term).join(', ')}.`
+              : (data?.sessions || []).length
+                ? 'Folytasd onnan, ahol legutóbb abbahagytátok.'
+                : 'Beszélgess hétköznapi témákról a saját szinteden. A LIVO közben figyeli, mit érdemes később gyakorolnod.'}
           </p>
           <div className="mt-5 flex items-center gap-3">
             <button data-testid="home-start-btn" onClick={() => openLive('free')} className="inline-flex items-center gap-2 rounded-full bg-white text-ink font-semibold text-sm px-5 py-3 active:scale-95 transition-transform shadow-soft">
@@ -81,6 +87,7 @@ export function HomeView({ data, openLive, goto, onTeacher }) {
           <button onClick={() => goto('learn')} className="text-xs font-semibold text-brand">Tanulás</button>
         </div>
         <div className="space-y-2">
+          {(data?.homework || []).length === 0 && <p className="text-sm text-ink-mute">Még nincs házi. Az első óra után itt kapsz rövid, személyre szabott gyakorlást.</p>}
           {(data?.homework || []).slice(0, 3).map(h => (
             <label key={h.id} data-testid={`home-hw-${h.id}`} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3 cursor-pointer">
               <input type="checkbox" checked={!!h.done} onChange={e => toggleHomework(h.id, e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
@@ -102,9 +109,10 @@ function StreakCard({ sessions }) {
   useEffect(() => {
     const top = reached[reached.length - 1];
     if (!top) return;
-    const seen = Number(localStorage.getItem('livo_streak_milestone') || 0);
+    let seen = 0;
+    try { seen = Number(localStorage.getItem('livo_streak_milestone') || 0); } catch { /* privacy mode */ }
     if (top > seen) {
-      localStorage.setItem('livo_streak_milestone', String(top));
+      try { localStorage.setItem('livo_streak_milestone', String(top)); } catch { /* privacy mode */ }
       const fire = (opts) => { try { confetti({ particleCount: 110, spread: 75, startVelocity: 38, origin: { y: 0.32 }, colors: ['#F59E0B', '#4F46E5', '#10B981', '#F43F5E', '#FBBF24'], ...opts }); } catch { /* noop */ } };
       fire({});
       setTimeout(() => fire({ particleCount: 60, spread: 110, origin: { y: 0.38 } }), 320);
@@ -162,9 +170,16 @@ function FocusCard({ onClick, icon: Icon, title, sub, tag }) {
 }
 
 export function PracticeView({ data, openLive, onTeacher, onSituation }) {
+  const { saveProfile } = useStore();
   const t = TEACHERS[data?.profile?.teacher] || TEACHERS.james;
-  const [langMode, setLangMode] = useState(() => localStorage.getItem('livo_live_language') || 'hu');
-  const setLanguage = (value) => { setLangMode(value); localStorage.setItem('livo_live_language', value); };
+  const initialMix = ['english', 'mixed', 'hungarian'].includes(data?.profile?.liveLanguageMix)
+    ? data.profile.liveLanguageMix
+    : 'hungarian';
+  const [languageMix, setLanguageMix] = useState(initialMix);
+  const setLanguage = (value) => {
+    setLanguageMix(value);
+    saveProfile?.({ profile: { liveLanguageMix: value } });
+  };
   const liveModes = Object.values(MODES).filter(m => m.id !== 'vocabulary');
 
   return (
@@ -177,11 +192,14 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
 
       <section className="rounded-[1.25rem] bg-white p-4 shadow-soft ring-1 ring-slate-100">
         <div className="text-xs font-semibold text-ink-mute mb-2">Az óra nyelve</div>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => setLanguage('hu')} className={`rounded-xl py-2.5 text-sm font-semibold ${langMode === 'hu' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Főleg magyarul</button>
-          <button onClick={() => setLanguage('en')} className={`rounded-xl py-2.5 text-sm font-semibold ${langMode === 'en' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Főleg angolul</button>
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => setLanguage('hungarian')} className={`rounded-xl py-2.5 text-xs font-semibold ${languageMix === 'hungarian' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Magyar</button>
+          <button onClick={() => setLanguage('mixed')} className={`rounded-xl py-2.5 text-xs font-semibold ${languageMix === 'mixed' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Vegyes</button>
+          <button onClick={() => setLanguage('english')} className={`rounded-xl py-2.5 text-xs font-semibold ${languageMix === 'english' ? 'bg-brand text-white' : 'bg-slate-50 text-ink-mute'}`}>Angol</button>
         </div>
-        <p className="text-[11px] text-ink-faint mt-2">A szógyakorló külön a Tanulás menüben van; a Live itt folyékony beszélgetésre marad.</p>
+        <p className="text-[11px] text-ink-faint mt-2">
+          Magyar: magyarázat és instrukció magyarul. Vegyes: több angol, rövid magyar segítséggel. Angol: végig angolul.
+        </p>
       </section>
 
       <div className="grid grid-cols-1 gap-3">
@@ -189,7 +207,7 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
           const Icon = ICONS[m.icon] || Sparkles;
           const featured = m.tag === 'AJÁNLOTT';
           return (
-            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => m.id === 'situation' ? onSituation?.() : openLive(m.id, { langMode })}
+            <button key={m.id} data-testid={`mode-${m.id}`} onClick={() => m.id === 'situation' ? onSituation?.() : openLive(m.id, { languageMix })}
               className={`relative overflow-hidden text-left rounded-[1.35rem] p-5 active:scale-[.98] transition-transform ${featured ? 'bg-task-bg text-task-text shadow-card' : 'bg-white text-ink shadow-soft ring-1 ring-slate-100'}`}>
               {featured && <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand/40 blur-2xl" />}
               <div className="relative flex items-start gap-3">
