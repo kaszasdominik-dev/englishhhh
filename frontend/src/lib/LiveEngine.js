@@ -900,6 +900,13 @@ export class LiveEngine {
     if (turn.id === this.lastCheckedTurnId) return;
     const text = normalizeSpeechText(turn.text); if (!text) return;
     if (this.mode === 'situation' && this.scenario) return this.verifySituationTurn(seq, turn, text);
+    // A visible practice card has its own task evaluator; running turn-check too would
+    // duplicate cost and can produce conflicting feedback. Very short replies are also
+    // poor grammar-correction candidates and create unnecessary backend calls.
+    if ((this.practiceTarget?.text && !this.practiceTarget?.completed) || text.split(/\s+/).filter(Boolean).length < 3) {
+      this.lastCheckedTurnId = turn.id;
+      return;
+    }
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
