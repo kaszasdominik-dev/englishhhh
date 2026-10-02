@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { api, BACKEND_URL } from './api';
+import { api, BACKEND_URL, clientHeaders } from './api';
 import { TEACHERS, normalizeSpeechText } from './livo';
 import { toast } from 'sonner';
 
@@ -43,27 +43,39 @@ export function StoreProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const d = await api('/bootstrap');
-        setData(d);
-      } catch (e) {
-        setError('Nem sikerült betölteni a LIVO-t.');
-      } finally {
-        setReady(true);
-      }
-    })();
-  }, []);
+  const bootstrapState = useCallback(async () => {
+    setReady(false);
+    setError(null);
+    try {
+      const d = await api('/bootstrap', { timeoutMs: 12000 });
+      setData(d);
+      return true;
+    } catch (e) {
+      setError(e?.message || 'Nem sikerült betölteni a LIVO-t.');
+      return false;
+    } finally {
+      setReady(true);
+    }
+  }, [setData]);
+
+  useEffect(() => { bootstrapState(); }, [bootstrapState]);
 
   const saveProfile = useCallback(async (patch = {}, onboarded = false) => {
-    setData(prev => ({ ...prev, profile: { ...prev.profile, ...(patch.profile || {}) }, user: { ...prev.user, ...(patch.user || {}) } }));
+    let before = null;
+    setData(prev => {
+      before = prev;
+      return { ...prev, profile: { ...prev.profile, ...(patch.profile || {}) }, user: { ...prev.user, ...(patch.user || {}) } };
+    });
     try {
       const r = await api('/profile', { method: 'POST', body: JSON.stringify({ profile: patch.profile, user: patch.user, onboarded }) });
       setData(r.state);
       return r.state;
-    } catch { /* keep optimistic */ }
-  }, []);
+    } catch (e) {
+      if (before) setData(before);
+      toast.error(e?.message || 'Nem sikerült menteni a beállítást.');
+      return null;
+    }
+  }, [setData]);
 
   const saveVocabulary = useCallback(async (payload, { quiet = false } = {}) => {
     const clean = { ...payload, term: normalizeSpeechText(payload.term || ''), meaning: normalizeSpeechText(payload.meaning || ''), example: normalizeSpeechText(payload.example || ''), saved: true };
@@ -91,9 +103,19 @@ export function StoreProvider({ children }) {
   }, []);
 
   const toggleHomework = useCallback(async (id, done) => {
-    setData(prev => ({ ...prev, homework: prev.homework.map(h => h.id === id ? { ...h, done } : h) }));
-    try { const r = await api('/homework', { method: 'POST', body: JSON.stringify({ id, done }) }); setData(r.state); } catch { /* ignore */ }
-  }, []);
+    let before = null;
+    setData(prev => {
+      before = prev;
+      return { ...prev, homework: (prev.homework || []).map(h => h.id === id ? { ...h, done } : h) };
+    });
+    try {
+      const r = await api('/homework', { method: 'POST', body: JSON.stringify({ id, done }) });
+      setData(r.state);
+    } catch (e) {
+      if (before) setData(before);
+      toast.error(e?.message || 'Nem sikerült menteni a házit.');
+    }
+  }, [setData]);
 
   const savePracticeFocus = useCallback(async (payload) => {
     try {
@@ -123,7 +145,7 @@ export function StoreProvider({ children }) {
   const previewTeacher = useCallback(async (id) => {
     const t = TEACHERS[id]; if (!t) return;
     try {
-      const r = await fetch(`${BACKEND_URL}/api/voice-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher: id, text: t.preview }) });
+      const r = await fetch(`${BACKEND_URL}/api/voice-preview`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher: id, text: t.preview }) });
       if (!r.ok) throw new Error('no api');
       const blob = await r.blob();
       if (previewRef.current) previewRef.current.pause();
@@ -142,6 +164,6 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  const value = { data, setData, ready, error, saveProfile, saveVocabulary, deleteVocabulary, toggleHomework, savePracticeFocus, deletePracticeFocus, resetLearning, previewTeacher };
+  const value = { data, setData, ready, error, retryBootstrap: bootstrapState, saveProfile, saveVocabulary, deleteVocabulary, toggleHomework, savePracticeFocus, deletePracticeFocus, resetLearning, previewTeacher };
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
