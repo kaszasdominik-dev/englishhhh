@@ -16,7 +16,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_LIVE_MODEL: ${OPENAI_LIVE_MODEL:-gpt-live-1}
       OPENAI_REASONING_MODEL: ${OPENAI_REASONING_MODEL:-gpt-5.6-luna}
-      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}
+      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-gpt-realtime-2.1-mini}
       PEXELS_API_KEY: ${PEXELS_API_KEY:-}
       CORS_ORIGINS: http://localhost:8080
       TURN_URLS: ${TURN_URLS:-}
