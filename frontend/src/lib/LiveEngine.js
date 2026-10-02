@@ -245,7 +245,15 @@ export class LiveEngine {
       if (this.finishing || this.timeLimitReached || this.connected) return;
       this.resumeAfterReconnect = true;
       const ok = await this.connect(true);
-      if (ok) return; // markConnected clears reconnecting on session.started
+      if (ok) {
+        // Creating the transport is not enough: wait for the Live session.started event.
+        const deadline = Date.now() + 9000;
+        while (!this.connected && !this.finishing && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+        if (this.connected) return;
+        this.disconnectTransport(false);
+      }
       this.resumeAfterReconnect = false;
     }
     this.reconnecting = false; this.reconnectFailed = true;
@@ -1125,8 +1133,15 @@ export class LiveEngine {
     this.preferenceBadge = 'FOLYTATÁS…';
     this.status = 'Kapcsolódás…'; this.connectionLabel = 'Újracsatlakozás…'; this.notify();
     const ok = await this.connect(true);
-    if (!ok) {
-      this.reconnecting = false; this.reconnectFailed = true; this.autoPaused = true;
+    if (ok) {
+      const deadline = Date.now() + 9000;
+      while (!this.connected && !this.finishing && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+    if (!ok || !this.connected) {
+      this.disconnectTransport(false);
+      this.reconnecting = false; this.reconnectFailed = true; this.autoPaused = true; this.resumeAfterReconnect = false;
       this.preferenceBadge = 'SZÜNET';
       this.status = 'Nem sikerült folytatni'; this.connectionLabel = 'Kapcsolat nélkül'; this.notify();
       return;
