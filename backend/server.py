@@ -1615,12 +1615,7 @@ cors_origins = [x.strip() for x in os.environ.get(
 allow_all_origins = '*' in cors_origins
 cors_origin_regex = os.environ.get(
     'CORS_ORIGIN_REGEX',
-    r'^https?://(?:localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):3000
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
-
+    r'^https?://(?:localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):3000$'
 )
 app.add_middleware(
     CORSMiddleware,
