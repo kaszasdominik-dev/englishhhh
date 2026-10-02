@@ -86,7 +86,7 @@ export function StoreProvider({ children }) {
       if (!quiet) toast.error('Nem sikerült elmenteni a szót.');
       return null;
     }
-  }, []);
+  }, [setData]);
 
   const deleteVocabulary = useCallback(async (id) => {
     try {
@@ -94,7 +94,7 @@ export function StoreProvider({ children }) {
       setData(r.state);
       toast.success('Szó törölve.');
     } catch { toast.error('Nem sikerült törölni a szót.'); }
-  }, []);
+  }, [setData]);
 
   const toggleHomework = useCallback(async (id, done) => {
     try {
@@ -115,7 +115,7 @@ export function StoreProvider({ children }) {
       toast.error(e.message || 'Nem sikerült elmenteni a gyakorlási témát.');
       return null;
     }
-  }, []);
+  }, [setData]);
 
   const deletePracticeFocus = useCallback(async (id) => {
     try {
@@ -123,11 +123,11 @@ export function StoreProvider({ children }) {
       setData(r.state);
       toast.success('Törölve a gyakorlandók közül.');
     } catch { toast.error('Nem sikerült törölni.'); }
-  }, []);
+  }, [setData]);
 
   const resetLearning = useCallback(async () => {
     try { const r = await api('/privacy/reset', { method: 'DELETE' }); setData(r.state); toast.success('Tanulási adatok törölve.'); } catch { toast.error('Nem sikerült törölni.'); }
-  }, []);
+  }, [setData]);
 
   const previewRef = useRef(null);
   const previewTeacher = useCallback(async (id) => {
