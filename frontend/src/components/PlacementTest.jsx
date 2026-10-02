@@ -39,7 +39,7 @@ export function PlacementTest({ onComplete, onBack }) {
   const answer = (choice) => {
     if (!question || feedback) return;
     const isDontKnow = choice === '__dont_know__';
-    setFeedback({ choice, correct: !isDontKnow && choice === question.correctAnswer, dontKnow: isDontKnow });
+    setFeedback({ choice, correct: !isDontKnow && choice === question.answer, dontKnow: isDontKnow });
     window.setTimeout(() => {
       const next = answerPlacementQuestion(state, question, choice);
       setState(next);
@@ -123,7 +123,7 @@ export function PlacementTest({ onComplete, onBack }) {
               className={`w-full rounded-2xl px-4 py-3.5 text-left text-sm font-semibold active:scale-[.99] transition-all ring-1 ${
                 feedback?.choice === option
                   ? (feedback.correct ? 'bg-emerald-50 ring-emerald-300 text-emerald-800' : 'bg-rose-50 ring-rose-300 text-rose-800')
-                  : feedback && option === question.correctAnswer
+                  : feedback && option === question.answer
                     ? 'bg-emerald-50 ring-emerald-200 text-emerald-800'
                     : 'bg-slate-50 hover:bg-brand-soft ring-slate-100 text-ink'
               }`}
