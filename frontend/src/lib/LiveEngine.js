@@ -162,7 +162,7 @@ export class LiveEngine {
       let res, payload;
       try {
         res = await fetch(`${API}/live-session`, {
-          method: 'POST', headers: clientHeaders({ 'Content-Type': 'application/json' }), signal: ctrl.signal,
+          method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), signal: ctrl.signal,
           body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, scenarioId: this.scenario?.id || null, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
         });
         const raw = await res.text();
@@ -702,6 +702,7 @@ export class LiveEngine {
       try {
         const r = await fetch(`${API}/word-help`, {
           method: 'POST',
+          credentials: 'include',
           headers: clientHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ word: term, context: this.lastByRole.assistant?.text || term, direction: 'en_hu', explicitLookup: true }),
         }).then(readJsonResponse);
@@ -902,7 +903,7 @@ export class LiveEngine {
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
-      const r = await fetch(`${API}/turn-check`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(readJsonResponse);
+      const r = await fetch(`${API}/turn-check`, { method: 'POST', credentials: 'include', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(readJsonResponse);
       if (seq !== this.turnCheckSeq) return;
       this.lastCheckedTurnId = turn.id;
       if (r?.shouldCorrect && Number(r.confidence) >= 0.9 && r.corrected && r.original) this.showCorrection(`${r.original} → ${r.corrected}`, r.reason || 'Pontos javítás.');
@@ -976,7 +977,7 @@ export class LiveEngine {
           scenarioId:this.scenario.id, stepIndex:this.situationStepIndex, learnerText:text,
           previousAssistant:prev, frustration:this.situationFrustration,
         }),
-      }).then(x=>x.json());
+      }).then(readJsonResponse);
       if (seq !== this.turnCheckSeq) return;
 
       this.situationTurnCount += 1;
