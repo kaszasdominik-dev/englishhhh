@@ -29,7 +29,7 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 PEXELS_API_KEY = os.environ.get('PEXELS_API_KEY', '')
 LIVE_MODEL = os.environ.get('OPENAI_LIVE_MODEL', 'gpt-live-1')
 REASONING_MODEL = os.environ.get('OPENAI_REASONING_MODEL', 'gpt-5.6-luna')
-TTS_MODEL = os.environ.get('OPENAI_TTS_MODEL', 'gpt-4o-mini-tts')
+TTS_MODEL = os.environ.get('OPENAI_TTS_MODEL', 'gpt-realtime-2.1-mini')
 
 app = FastAPI()
 api = APIRouter(prefix="/api")
