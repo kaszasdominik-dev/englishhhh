@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { TeacherAvatar } from '@/components/TeacherAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { TEACHERS, MODE_NAMES, formatClock, normalizeSpeechText } from '@/lib/livo';
@@ -32,7 +33,7 @@ export function LiveRoom({ engine }) {
           else engine.end();
         }} className="h-9 w-9 grid place-items-center rounded-full bg-white/10 active:scale-90 transition-transform"><X size={18} /></button>
         <div className="flex items-center gap-2.5">
-          <img alt={t.name} src={t.img} className="h-9 w-9 rounded-full object-cover ring-2 ring-white/20" />
+          <TeacherAvatar teacher={t} className="h-9 w-9 rounded-full ring-2 ring-white/20" />
           <div className="leading-none">
             <b className="text-sm">{t.name}</b>
             <div className="mt-1 flex items-center gap-1.5">
@@ -520,7 +521,7 @@ function Orb({ state, teacher }) {
       <motion.div className="absolute inset-0 rounded-full bg-brand/40" animate={{ scale: speaking ? [1, 1.18, 1] : listening ? [1, 1.08, 1] : 1, opacity: speaking ? [0.5, 0.15, 0.5] : 0.3 }} transition={{ duration: speaking ? 1.1 : 1.8, repeat: Infinity }} />
       <motion.div className="absolute inset-4 rounded-full bg-brand/50" animate={{ scale: speaking ? [1, 1.12, 1] : 1 }} transition={{ duration: 1.3, repeat: Infinity }} />
       <div className={`relative h-28 w-28 rounded-full overflow-hidden ring-4 ${muted ? 'ring-rose-500/50' : speaking ? 'ring-emerald-400/60' : listening ? 'ring-brand/60' : 'ring-white/20'}`}>
-        <img alt={teacher.name} src={teacher.img} className="h-full w-full object-cover" />
+        <TeacherAvatar teacher={teacher} className="h-full w-full rounded-full" />
       </div>
     </div>
   );
