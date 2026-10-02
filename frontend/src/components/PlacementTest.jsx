@@ -33,15 +33,21 @@ function speak(text) {
 export function PlacementTest({ onComplete, onBack }) {
   const [state, setState] = useState(() => initialPlacementState());
   const [result, setResult] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const question = useMemo(() => result ? null : selectNextQuestion(state), [state, result]);
 
   const answer = (choice) => {
-    if (!question) return;
-    const next = answerPlacementQuestion(state, question, choice);
-    setState(next);
-    if (shouldFinishPlacement(next) || !selectNextQuestion(next)) {
-      setResult(buildPlacementResult(next));
-    }
+    if (!question || feedback) return;
+    const isDontKnow = choice === '__dont_know__';
+    setFeedback({ choice, correct: !isDontKnow && choice === question.correctAnswer, dontKnow: isDontKnow });
+    window.setTimeout(() => {
+      const next = answerPlacementQuestion(state, question, choice);
+      setState(next);
+      setFeedback(null);
+      if (shouldFinishPlacement(next) || !selectNextQuestion(next)) {
+        setResult(buildPlacementResult(next));
+      }
+    }, 520);
   };
 
   if (result) {
@@ -113,7 +119,14 @@ export function PlacementTest({ onComplete, onBack }) {
               key={option}
               data-testid={`placement-option-${i}`}
               onClick={() => answer(option)}
-              className="w-full rounded-2xl bg-slate-50 hover:bg-brand-soft ring-1 ring-slate-100 px-4 py-3.5 text-left text-sm font-semibold text-ink active:scale-[.99] transition-all"
+              disabled={!!feedback}
+              className={`w-full rounded-2xl px-4 py-3.5 text-left text-sm font-semibold active:scale-[.99] transition-all ring-1 ${
+                feedback?.choice === option
+                  ? (feedback.correct ? 'bg-emerald-50 ring-emerald-300 text-emerald-800' : 'bg-rose-50 ring-rose-300 text-rose-800')
+                  : feedback && option === question.correctAnswer
+                    ? 'bg-emerald-50 ring-emerald-200 text-emerald-800'
+                    : 'bg-slate-50 hover:bg-brand-soft ring-slate-100 text-ink'
+              }`}
             >
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-slate-200 text-[11px] text-ink-mute mr-2">{String.fromCharCode(65 + i)}</span>
               {option}
@@ -121,7 +134,14 @@ export function PlacementTest({ onComplete, onBack }) {
           ))}
         </div>
 
-        <button onClick={() => answer('__dont_know__')} className="mt-4 w-full rounded-xl py-2.5 text-sm text-ink-mute font-semibold">
+        {feedback && (
+          <div aria-live="polite" className={`mt-4 rounded-xl px-3 py-2.5 text-center text-sm font-bold ${
+            feedback.dontKnow ? 'bg-slate-100 text-ink-mute' : feedback.correct ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+          }`}>
+            {feedback.dontKnow ? 'Rendben — ezt is beleszámítjuk a szintbecslésbe.' : feedback.correct ? '✓ Helyes' : 'Nem ez volt a helyes válasz.'}
+          </div>
+        )}
+        <button disabled={!!feedback} onClick={() => answer('__dont_know__')} className="mt-4 w-full rounded-xl py-2.5 text-sm text-ink-mute font-semibold disabled:opacity-40">
           Nem tudom
         </button>
       </section>
