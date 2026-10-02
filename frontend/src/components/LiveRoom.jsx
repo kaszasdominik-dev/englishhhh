@@ -267,9 +267,9 @@ export function LiveRoom({ engine }) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-[#0B1120]/90 backdrop-blur-sm p-8 text-center">
             <div>
               <div className="mx-auto h-14 w-14 rounded-full bg-white/10 grid place-items-center mb-4"><Pause size={26} /></div>
-              <span className="text-[11px] tracking-widest font-bold text-slate-400">AUTOMATIKUS SZÜNET</span>
-              <h2 className="font-heading font-bold text-2xl mt-2">1 perce csend van.</h2>
-              <p className="text-sm text-slate-400 mt-2">Megállítottam az órát. A mikrofon most nem figyel, és az idő sem fogy.</p>
+              <span className="text-[11px] tracking-widest font-bold text-slate-400">{s.pauseReason === 'idle' ? 'AUTOMATIKUS SZÜNET' : 'SZÜNET'}</span>
+              <h2 className="font-heading font-bold text-2xl mt-2">{s.pauseReason === 'idle' ? '1 perce csend van.' : 'Az óra szünetel.'}</h2>
+              <p className="text-sm text-slate-400 mt-2">A Live kapcsolatot lezártuk, így szünet közben nem fut a beszélgetés és a LIVO órája sem.</p>
               <button onClick={() => engine.resumeFromPause()} className="mt-5 rounded-full bg-brand text-white font-semibold px-6 py-3 active:scale-95 transition-transform">Folytatom</button>
             </div>
           </motion.div>
