@@ -606,7 +606,18 @@ async def live_session(request: Request):
         language_mix = 'hungarian' if body.get('languageMode') == 'hu' else ('english' if body.get('languageMode') == 'en' else 'mixed')
     lang = 'hu' if language_mix == 'hungarian' else ('en' if language_mix == 'english' else None)
     pace = 'slow' if body.get('pace') == 'slow' else 'normal'
-    duration = clamp(int(body.get('durationMinutes') or 15), 5, 60)
+
+    requested_duration = clamp(int(body.get('durationMinutes') or 15), 5, 60)
+    subscription = state.get('subscription') or {}
+    included = max(0, int(subscription.get('includedMinutes') or 0))
+    used = max(0, int(subscription.get('usedMinutes') or 0))
+    remaining = max(0, included - used) if included > 0 else None
+    if remaining is not None and remaining <= 0:
+        return JSONResponse(
+            {"error": "Elfogyott a Live perckereted.", "code": "LIVE_MINUTES_EXHAUSTED"},
+            status_code=402,
+        )
+    duration = min(requested_duration, max(1, remaining)) if remaining is not None else requested_duration
     merged_profile = {**profile, **(body.get('profile') or {})}
     session = {
         'model': LIVE_MODEL,
@@ -628,7 +639,7 @@ async def live_session(request: Request):
             payload = r.json()
             if r.status_code < 400:
                 payload['livo'] = {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'free'),
-                                   'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
+                                   'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1'), 'durationMinutes': duration}
             return JSONResponse(payload, status_code=r.status_code)
         if r.status_code < 400:
             # Defensive compatibility: keep our browser contract JSON even if an upstream/proxy
@@ -636,7 +647,7 @@ async def live_session(request: Request):
             return JSONResponse({
                 'transport': {'type': 'webrtc', 'sdp': r.text},
                 'livo': {'teacher': teacher, 'teacherName': t['name'], 'voice': t['voice'], 'mode': body.get('mode', 'free'),
-                         'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1')}
+                         'languageMix': language_mix, 'cefr': merged_profile.get('cefr', 'B1'), 'durationMinutes': duration}
             }, status_code=r.status_code)
         return JSONResponse({'error': (r.text or f'Live upstream error {r.status_code}')[:1000], 'code': 'LIVE_UPSTREAM_ERROR'},
                             status_code=r.status_code)
