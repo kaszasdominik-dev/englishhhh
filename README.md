@@ -21,7 +21,7 @@ OPENAI_API_KEY=your_key_here
 CORS_ORIGINS=http://localhost:3000
 OPENAI_LIVE_MODEL=gpt-live-1
 OPENAI_REASONING_MODEL=gpt-5.6-luna
-OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_MODEL=gpt-realtime-2.1-mini
 ```
 
 ### Backend indítása
