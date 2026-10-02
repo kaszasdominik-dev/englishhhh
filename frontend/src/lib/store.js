@@ -9,7 +9,7 @@ export const useStore = () => useContext(StoreCtx);
 const DEFAULT_STATE = {
   user: { onboarded: false },
   profile: { cefr: '', teacher: 'james', weeklyMinutes: 120, correctionStyle: 'balanced', huHelp: 'on_request', goal: 'general', interests: [], focus: 'General English', learningPath: 'conversation' },
-  subscription: { plan: 'Próba', includedMinutes: 60, usedMinutes: 0 },
+  subscription: { plan: 'Próba', includedMinutes: 60, usedMinutes: 0, usedSeconds: 0 },
   stats: { totalMinutes: 0, weekMinutes: 0 },
   vocabulary: [],
   grammar: [],
