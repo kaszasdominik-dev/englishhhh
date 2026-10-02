@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { TEACHERS, MODES, MODE_NAMES, pct, computeStreak, normalizeSpeechText } from '@/lib/livo';
 import { FIXED_STARTER_TASKS } from '@/lib/learningTasks';
 import QuestionPracticeRoom from '@/components/QuestionPracticeRoom';
+import { TeacherAvatar } from '@/components/TeacherAvatar';
 import { toast } from 'sonner';
 import {
   ArrowRight, Briefcase, MessagesSquare, Sparkles, Wand2, UserRoundCheck, Clapperboard,
@@ -185,7 +186,7 @@ export function PracticeView({ data, openLive, onTeacher, onSituation }) {
   return (
     <div className="px-5 pt-5 space-y-5">
       <button onClick={onTeacher} data-testid="practice-teacher" className="w-full flex items-center gap-3 rounded-[1.25rem] bg-white p-3 shadow-soft ring-1 ring-slate-100 active:scale-[.99] transition-transform">
-        <img alt={t.name} src={t.img} className="h-11 w-11 rounded-2xl object-cover" />
+        <TeacherAvatar teacher={t} className="h-11 w-11 rounded-2xl" />
         <span className="flex-1 text-left"><small className="text-[10px] tracking-widest text-ink-mute font-semibold">TANÁR</small><b className="block text-ink">{t.name}</b></span>
         <span className="text-xs font-semibold text-brand">Csere</span>
       </button>
@@ -652,7 +653,7 @@ export function ProfileView({ onTeacher }) {
     <div className="px-5 pt-5 space-y-4">
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex items-center justify-between mb-3"><h3 className="font-heading font-bold text-ink">Tanár és hang</h3><button onClick={onTeacher} className="text-xs font-semibold text-brand">Csere</button></div>
-        <div className="flex items-center gap-3"><img alt={t.name} src={t.img} className="h-14 w-14 rounded-2xl object-cover" /><div><b className="text-ink">{t.name}</b><p className="text-xs text-ink-mute">{t.desc} · {t.sub}</p></div></div>
+        <div className="flex items-center gap-3"><TeacherAvatar teacher={t} className="h-14 w-14 rounded-2xl" /><div><b className="text-ink">{t.name}</b><p className="text-xs text-ink-mute">{t.desc} · {t.sub}</p></div></div>
         <div className="mt-3 text-[11px] text-ink-faint bg-slate-50 rounded-xl px-3 py-2">A hallott hang AI-generált, nem emberi hang.</div>
       </div>
 
@@ -739,7 +740,7 @@ function SessionHistory({ sessions }) {
           const mins = Math.max(1, Math.round((sess.durationSeconds || 0) / 60));
           return (
             <button key={sess.id} data-testid={`history-item-${sess.id}`} onClick={() => setOpen(sess)} className="w-full flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left active:scale-[.98] transition-transform">
-              <img alt={t.name} src={t.img} className="h-10 w-10 rounded-xl object-cover shrink-0" />
+              <TeacherAvatar teacher={t} className="h-10 w-10 rounded-xl" />
               <span className="flex-1 min-w-0">
                 <small className="text-[10px] text-ink-mute font-semibold">{fmtDate(sess.createdAt)} · {t.name} · {MODE_NAMES[sess.mode] || sess.mode} · {mins} perc</small>
                 <b className="block text-sm text-ink truncate">{sess.summary?.headline || 'Lezárt óra'}</b>
@@ -768,7 +769,7 @@ function SessionDetail({ session, onClose }) {
         <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300 mb-4" />
         <button data-testid="history-close" onClick={onClose} className="absolute top-5 right-5 h-8 w-8 grid place-items-center rounded-full bg-slate-100 text-ink-mute"><X size={15} /></button>
         <div className="flex items-center gap-3">
-          <img alt={t.name} src={t.img} className="h-12 w-12 rounded-2xl object-cover" />
+          <TeacherAvatar teacher={t} className="h-12 w-12 rounded-2xl" />
           <div>
             <small className="text-[10px] tracking-widest font-bold text-ink-mute">{fmtDate(session.createdAt)} · {MODE_NAMES[session.mode] || session.mode} · {mins} PERC</small>
             <h2 className="font-heading font-extrabold text-xl text-ink leading-tight">{a.headline || 'Lezárt óra'}</h2>
