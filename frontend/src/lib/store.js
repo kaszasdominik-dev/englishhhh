@@ -130,6 +130,7 @@ export function StoreProvider({ children }) {
   }, [setData]);
 
   const previewRef = useRef(null);
+  const previewUrlRef = useRef(null);
   const previewTeacher = useCallback(async (id) => {
     const t = TEACHERS[id]; if (!t) return;
     try {
@@ -137,19 +138,31 @@ export function StoreProvider({ children }) {
       if (!r.ok) throw new Error('no api');
       const blob = await r.blob();
       if (previewRef.current) previewRef.current.pause();
-      previewRef.current = new Audio(URL.createObjectURL(blob));
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = URL.createObjectURL(blob);
+      previewRef.current = new Audio(previewUrlRef.current);
+      previewRef.current.onended = () => {
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      };
       await previewRef.current.play();
       toast(`${t.name} · AI-hangminta`);
     } catch {
       if ('speechSynthesis' in window) {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(t.preview);
-        u.lang = t.accent === 'Brit' ? 'en-GB' : 'en-US';
+        u.lang = String(t.accent || '').toLowerCase().includes('british') ? 'en-GB' : 'en-US';
         u.rate = id === 'karen' ? 1.0 : id === 'vinnie' ? 0.91 : id === 'maya' ? 0.94 : 0.97;
         speechSynthesis.speak(u);
         toast('Böngészős hangminta · az élő órán az AI hangja szól');
       }
     }
+  }, []);
+
+  useEffect(() => () => {
+    try { previewRef.current?.pause(); } catch {}
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
   }, []);
 
   const value = { data, setData, ready, error, retryBootstrap: bootstrapState, saveProfile, saveVocabulary, deleteVocabulary, toggleHomework, savePracticeFocus, deletePracticeFocus, resetLearning, previewTeacher };
