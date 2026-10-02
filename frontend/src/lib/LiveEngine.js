@@ -180,6 +180,12 @@ export class LiveEngine {
       }
       const remoteSdp = payload?.transport?.sdp || payload?.sdp;
       if (!remoteSdp) throw new Error('A szerver nem adott vissza érvényes WebRTC SDP választ.');
+      const allowedMinutes = Number(payload?.livo?.durationMinutes || 0);
+      if (allowedMinutes > 0 && allowedMinutes !== this.sessionMinutes) {
+        this.sessionMinutes = allowedMinutes;
+        this.timeLeft = Math.max(1, Math.round(allowedMinutes * 60));
+        this.preferenceBadge = `${allowedMinutes} perc elérhető`;
+      }
       if (!isReconnect) { this.setDiag('session', 'done'); this.setDiag('webrtc', 'active'); }
       await pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp });
       if (!isReconnect) {
@@ -197,7 +203,13 @@ export class LiveEngine {
       if (!isReconnect) this.startConnectWatch();
       return true;
     } catch (e) {
-      this.error = e.code === 'NO_API_KEY' ? 'Az élő beszélgetéshez a szerveren OpenAI Realtime kulcs kell.' : (String(e.message).includes('mediaDevices') || e.name === 'NotAllowedError' ? 'A mikrofon eléréséhez engedély kell (HTTPS).' : `Nem sikerült kapcsolódni: ${e.message}`);
+      this.error = e.code === 'NO_API_KEY'
+        ? 'Az élő beszélgetéshez a szerveren OpenAI Realtime kulcs kell.'
+        : e.code === 'LIVE_MINUTES_EXHAUSTED'
+          ? 'Elfogyott a Live perckereted.'
+          : (String(e.message).includes('mediaDevices') || e.name === 'NotAllowedError'
+            ? 'A mikrofon eléréséhez engedély kell (HTTPS).'
+            : `Nem sikerült kapcsolódni: ${e.message}`);
       if (!isReconnect) { const act = this.diag.find(d => d.state === 'active'); if (act) this.setDiag(act.key, 'error', act.detail || 'hiba'); this.connectionLabel = 'Nem sikerült'; this.status = 'Kapcsolódási hiba'; this.phase = 'setup'; }
       this.disconnectTransport(false); this.notify();
       return false;
