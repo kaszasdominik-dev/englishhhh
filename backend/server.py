@@ -70,6 +70,19 @@ async def bind_client_context(request: Request, call_next):
     token = _client_id_ctx.set(client_id)
     request_id = str(request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16])
     try:
+        # Reject unexpectedly large JSON/form requests before they reach AI-backed routes.
+        # This protects both memory and accidental prompt-cost spikes.
+        if request.method in ('POST', 'PUT', 'PATCH'):
+            try:
+                content_length = int(request.headers.get('content-length') or 0)
+            except ValueError:
+                content_length = 0
+            if content_length > 1_500_000:
+                return JSONResponse(
+                    {"error": "A kérés túl nagy.", "code": "REQUEST_TOO_LARGE"},
+                    status_code=413,
+                )
+
         limit = _route_rate_limit(request.url.path)
         if limit and request.method != 'OPTIONS':
             max_calls, window = limit
@@ -637,6 +650,16 @@ async def health():
     return {"ok": db_ok, "database": db_ok, "openaiConfigured": bool(OPENAI_API_KEY), "liveModel": LIVE_MODEL,
             "analysisModel": REASONING_MODEL, "appVersion": "5.1", "pexelsConfigured": bool(PEXELS_API_KEY)}
 
+@api.get("/ready")
+async def ready():
+    try:
+        await db.command("ping")
+    except Exception:
+        return JSONResponse({"ready": False, "database": False, "openaiConfigured": bool(OPENAI_API_KEY)}, status_code=503)
+    if not OPENAI_API_KEY:
+        return JSONResponse({"ready": False, "database": True, "openaiConfigured": False, "code": "NO_API_KEY"}, status_code=503)
+    return {"ready": True, "database": True, "openaiConfigured": True, "liveModel": LIVE_MODEL, "analysisModel": REASONING_MODEL}
+
 @api.get("/bootstrap")
 async def bootstrap():
     return public_state(await load_state())
@@ -660,7 +683,7 @@ async def live_session(request: Request):
     memory = [f"{v.get('term') or '[English pending]'} = {v.get('meaning') or '[Hungarian pending]'}; mastery {v.get('mastery',40)}%; status {v.get('status','learning')}" for v in weak]
     memory += [f"grammar: {g.get('pattern')}; mastery {g.get('mastery')}%; example {g.get('original')} \u2192 {g.get('corrected')}" for g in grammar]
     if isinstance(body.get('memory'), list):
-        memory += body['memory'][:6]
+        memory += [clean_word_field(x)[:500] for x in body['memory'][:6] if clean_word_field(x)]
     language_mix = body.get('languageMix') if body.get('languageMix') in ('english', 'mixed', 'hungarian') else None
     if not language_mix:
         language_mix = 'hungarian' if body.get('languageMode') == 'hu' else ('english' if body.get('languageMode') == 'en' else 'mixed')
@@ -742,7 +765,11 @@ async def scenario_text_turn(request: Request):
     teacher_id = body.get("teacher") if body.get("teacher") in teachers else "maya"
     teacher_style = teachers.get(teacher_id, teachers["maya"])
     learner = clean_word_field(body.get("learnerText"))[:700]
-    transcript = (body.get("transcript") or [])[-10:]
+    transcript = [
+        {"role": clean_word_field(x.get("role"))[:20], "text": clean_word_field(x.get("text"))[:900]}
+        for x in (body.get("transcript") or [])[-10:]
+        if isinstance(x, dict) and clean_word_field(x.get("text"))
+    ]
     frustration = max(0, min(3, int(body.get("frustration") or 0)))
     schema = {"type":"object","additionalProperties":False,"properties":{
         "assistantText":{"type":"string"},
@@ -1380,7 +1407,11 @@ def norm_vocab_key(v=''):
 async def analyze_session(request: Request):
     body = await request.json()
     state = await load_state()
-    transcript = [x for x in (body.get('transcript') or []) if x and x.get('text')][-240:]
+    transcript = [
+        {"role": clean_word_field(x.get("role"))[:20], "text": clean_word_field(x.get("text"))[:1200]}
+        for x in (body.get('transcript') or [])[-160:]
+        if isinstance(x, dict) and clean_word_field(x.get("text"))
+    ]
     duration = int(body.get('durationSeconds') or 0)
     live_usage_seconds = max(0, int(body.get('liveUsageSeconds') or 0))
     delegated = body.get('delegatedUsage') if isinstance(body.get('delegatedUsage'), dict) else {}
