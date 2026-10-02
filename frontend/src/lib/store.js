@@ -61,17 +61,11 @@ export function StoreProvider({ children }) {
   useEffect(() => { bootstrapState(); }, [bootstrapState]);
 
   const saveProfile = useCallback(async (patch = {}, onboarded = false) => {
-    let before = null;
-    setData(prev => {
-      before = prev;
-      return { ...prev, profile: { ...prev.profile, ...(patch.profile || {}) }, user: { ...prev.user, ...(patch.user || {}) } };
-    });
     try {
       const r = await api('/profile', { method: 'POST', body: JSON.stringify({ profile: patch.profile, user: patch.user, onboarded }) });
       setData(r.state);
       return r.state;
     } catch (e) {
-      if (before) setData(before);
       toast.error(e?.message || 'Nem sikerült menteni a beállítást.');
       return null;
     }
