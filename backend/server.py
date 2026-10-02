@@ -1585,12 +1585,22 @@ cors_origins = [x.strip() for x in os.environ.get(
     'http://localhost:3000,http://127.0.0.1:3000'
 ).split(',') if x.strip()]
 allow_all_origins = '*' in cors_origins
+cors_origin_regex = os.environ.get(
+    'CORS_ORIGIN_REGEX',
+    r'^https?://(?:localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):3000
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
+
+)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=not allow_all_origins,
     allow_origins=['*'] if allow_all_origins else cors_origins,
+    allow_origin_regex=None if allow_all_origins else cors_origin_regex,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Livo-Client"],
+    allow_headers=["Content-Type", "Authorization", "X-Livo-Client", "X-Request-ID"],
 )
 
 @app.on_event("shutdown")
