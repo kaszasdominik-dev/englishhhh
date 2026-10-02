@@ -648,7 +648,10 @@ export function ProfileView({ onTeacher }) {
   const t = TEACHERS[p.teacher] || TEACHERS.james;
   const set = (patch) => saveProfile({ profile: patch });
   const subscription = data?.subscription || {};
-  const rem = Math.max(0, (subscription.includedMinutes || 0) - (subscription.usedMinutes || 0));
+  const includedSeconds = Math.max(0, Number(subscription.includedMinutes || 0) * 60);
+  const usedSeconds = Math.max(0, Number(subscription.usedSeconds ?? (Number(subscription.usedMinutes || 0) * 60)));
+  const remainingSeconds = Math.max(0, includedSeconds - usedSeconds);
+  const rem = Math.ceil(remainingSeconds / 60);
   return (
     <div className="px-5 pt-5 space-y-4">
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
@@ -679,7 +682,7 @@ export function ProfileView({ onTeacher }) {
         <div className="flex items-center justify-between mb-3"><h3 className="font-heading font-bold text-ink">Előfizetés</h3><span className="text-[10px] font-bold text-ink-mute bg-slate-100 rounded-full px-2.5 py-1">{subscription.plan || 'Próba'}</span></div>
         <div className="font-heading font-extrabold text-2xl text-ink">{rem} perc</div>
         <div className="text-xs text-ink-mute">maradt ebben az időszakban</div>
-        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${pct(rem / (subscription.includedMinutes || 1) * 100)}%` }} /></div>
+        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-brand rounded-full" style={{ width: `${pct(remainingSeconds / (includedSeconds || 1) * 100)}%` }} /></div>
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
