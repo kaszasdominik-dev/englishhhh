@@ -22,7 +22,7 @@ export class LiveEngine {
     this.mode = 'free'; this.teacher = 'maya'; this.sessionMinutes = 15;
     this.profile = {}; this.languageMix = 'mixed'; this.langMode = null; this.pace = 'normal'; this.cefrLevel = 'B1';
     this.status = 'Készen áll'; this.connectionLabel = 'Felkészülés';
-    this.connected = false; this.muted = false; this.autoPaused = false; this.timeLimitReached = false;
+    this.connected = false; this.muted = false; this.autoPaused = false; this.pauseReason = ''; this.timeLimitReached = false;
     this.finishing = false; this.error = null;
     this.timeline = []; this.lastByRole = {};
     this.assistantSpeaking = false; this.userSpeaking = false; this.serverSpeechActive = false;
@@ -64,7 +64,7 @@ export class LiveEngine {
     return {
       phase: this.phase, mode: this.mode, teacher: this.teacher, sessionMinutes: this.sessionMinutes,
       status: this.status, connectionLabel: this.connectionLabel, connected: this.connected, muted: this.muted,
-      autoPaused: this.autoPaused, timeLimitReached: this.timeLimitReached, finishing: this.finishing, error: this.error,
+      autoPaused: this.autoPaused, pauseReason: this.pauseReason, timeLimitReached: this.timeLimitReached, finishing: this.finishing, error: this.error,
       timeline: this.timeline, orb: this.orb, userEcho: this.userEcho, needsAudioUnlock: this.needsAudioUnlock, caption: this.caption,
       practiceTarget: this.practiceTarget, correction: this.correction, pronunciation: this.pronunciation,
       wordCapture: this.wordCapture, wordPopover: this.wordPopover, notes: this.notes,
@@ -1109,13 +1109,13 @@ export class LiveEngine {
     const elapsed = Math.max(0, Date.now() - (this.lastMicActivity || Date.now())); const delay = Math.max(800, 60000 - elapsed);
     this.inactivityTimer = setTimeout(() => {
       const quiet = Date.now() - (this.lastMicActivity || 0);
-      if (this.connected && !this.userSpeaking && !this.autoPaused && !this.timeLimitReached && quiet >= 59000) this.autoPause();
+      if (this.connected && !this.userSpeaking && !this.autoPaused && !this.timeLimitReached && quiet >= 59000) this.autoPause('idle');
       else this.scheduleInactivityPause();
     }, delay);
   }
-  autoPause() {
+  autoPause(reason = 'manual') {
     if (this.autoPaused || !this.connected) return;
-    this.autoPaused = true; this.timerPaused = true; clearTimeout(this.idleTimer);
+    this.autoPaused = true; this.pauseReason = reason; this.timerPaused = true; clearTimeout(this.idleTimer);
     this.usageOffset = this.usageSeconds || this.usageOffset || 0;
     this.status = 'Szüneteltetve';
     this.connectionLabel = 'Szünet';
@@ -1128,7 +1128,7 @@ export class LiveEngine {
   }
   async resumeFromPause() {
     if (!this.autoPaused || this.finishing || this.timeLimitReached) return;
-    this.autoPaused = false; this.timerPaused = true; this.muted = false;
+    this.autoPaused = false; this.pauseReason = ''; this.timerPaused = true; this.muted = false;
     this.reconnecting = true; this.reconnectFailed = false; this.resumeAfterReconnect = true;
     this.preferenceBadge = 'FOLYTATÁS…';
     this.status = 'Kapcsolódás…'; this.connectionLabel = 'Újracsatlakozás…'; this.notify();
