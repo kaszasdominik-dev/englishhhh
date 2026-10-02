@@ -22,7 +22,8 @@
     "plan": "Próba",
     "includedMinutes": 60,
     "usedMinutes": 0,
-    "renewsAt": null
+    "renewsAt": null,
+    "usedSeconds": 0
   },
   "vocabulary": [],
   "grammar": [],
