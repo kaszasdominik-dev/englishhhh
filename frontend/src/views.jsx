@@ -565,7 +565,22 @@ function HomeworkPane({ data }) {
 /* ------------------------------------------------------------ Progress */
 export function ProgressView({ data }) {
   const s = data?.stats || {};
-  const vals = [8, 0, 12, 6, 0, 7, 5], days = ['H', 'K', 'Sze', 'Cs', 'P', 'Szo', 'V'];
+  const days = ['H', 'K', 'Sze', 'Cs', 'P', 'Szo', 'V'];
+  const vals = useMemo(() => {
+    const out = Array(7).fill(0);
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    for (const session of (data?.sessions || [])) {
+      const d = new Date(session?.createdAt || 0);
+      if (Number.isNaN(d.getTime())) continue;
+      const copy = new Date(d); copy.setHours(0, 0, 0, 0);
+      const idx = Math.floor((copy.getTime() - monday.getTime()) / 86400000);
+      if (idx >= 0 && idx < 7) out[idx] += Math.max(1, Math.ceil(Number(session?.durationSeconds || 0) / 60));
+    }
+    return out;
+  }, [data?.sessions]);
   const cards = [
     { icon: Clock, label: 'Összes beszéd', val: `${s.totalMinutes || 0} perc`, sub: 'ezen a héten +' + (s.weekMinutes || 0) },
     { icon: Check, label: 'Stabil szókincs', val: (data?.vocabulary || []).filter(v => v.status === 'stable').length, sub: `${(data?.vocabulary || []).filter(v => v.status === 'learning').length} tanulás alatt` },
