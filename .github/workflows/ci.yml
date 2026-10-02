@@ -13,8 +13,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install production backend dependencies
+        run: pip install -r backend/requirements-prod.txt
       - name: Python syntax
         run: python -m py_compile backend/server.py backend/dictionary_engine.py backend/scenarios.py backend/question_bank.py backend/scripts/*.py
+      - name: Backend import smoke test
+        run: PYTHONPATH=backend python -c "import server; assert server.app is not None; print('backend import ok')"
       - name: Content-bank smoke test
         run: python -c "import sys; sys.path.insert(0, 'backend'); from question_bank import generate_question_bank; from scenarios import list_scenarios; q=generate_question_bank(); assert len(q)==10000; assert len({x['id'] for x in q})==10000; assert all(len(x['options'])==3 and x['correctAnswer'] in x['options'] for x in q); assert {'A1','A2','B1','B2','C1'} <= {x['cefr'] for x in q}; assert len(list_scenarios())>=10; print(len(q), 'questions,', len(list_scenarios()), 'scenarios')"
 
