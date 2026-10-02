@@ -23,7 +23,7 @@ const NAV = [
 
 function Root() {
   const store = useStore();
-  const { data, ready, error } = store;
+  const { data, ready, error, retryBootstrap } = store;
   const [view, setView] = useState('home');
   const [teacherSheet, setTeacherSheet] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
@@ -44,7 +44,7 @@ function Root() {
     });
   }
   const engine = engineRef.current;
-  if (typeof window !== 'undefined') window.__livoEngine = engine;
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') window.__livoEngine = engine;
   // keep callbacks fresh
   useEffect(() => {
     engine.cb.saveVocab = (p) => store.saveVocabulary(p, { quiet: p?.quiet === true });
@@ -54,7 +54,7 @@ function Root() {
     engine.cb.savePracticeFocus = (p) => store.savePracticeFocus?.(p);
   });
 
-  const openLive = (mode = 'business', options = {}) => {
+  const openLive = (mode = 'free', options = {}) => {
     const teacher = TEACHERS[data?.profile?.teacher] ? data.profile.teacher : 'maya';
     const profile = data?.profile || {};
     const languageMix = ['english', 'mixed', 'hungarian'].includes(options.languageMix)
@@ -67,7 +67,7 @@ function Root() {
   };
 
   if (!ready) return <BootScreen />;
-  if (error || !data) return <BootScreen error={error} />;
+  if (error || !data) return <BootScreen error={error} onRetry={retryBootstrap} />;
 
   const onboarded = data.user?.onboarded;
 
@@ -82,7 +82,7 @@ function Root() {
           {view === 'progress' && <ProgressView data={data} />}
           {view === 'profile' && <ProfileView onTeacher={() => setTeacherSheet(true)} />}
         </main>
-        <BottomNav view={view} setView={setView} openLive={() => { setView('practice'); }} onMic={() => openLive('business')} />
+        <BottomNav view={view} setView={setView} onMic={() => openLive('free')} />
 
         {teacherSheet && <TeacherSheet engine={engine} liveOpen={liveOpen} onClose={() => setTeacherSheet(false)} />}
         {liveOpen && <LiveRoom engine={engine} />}
@@ -149,12 +149,20 @@ function BottomNav({ view, setView, onMic }) {
   );
 }
 
-function BootScreen({ error }) {
+function BootScreen({ error, onRetry }) {
   return (
     <div className="min-h-screen grid place-items-center bg-[#E8ECF4] text-center p-8">
-      <div>
+      <div className="w-full max-w-sm">
         <div className="mx-auto h-14 w-14 rounded-3xl bg-brand text-white grid place-items-center font-heading font-extrabold text-2xl shadow-card animate-floaty">L</div>
         <p className="mt-5 text-ink-mute font-medium">{error || 'LIVO betöltése…'}</p>
+        {error && (
+          <>
+            <p className="mt-2 text-xs text-ink-faint">Helyi futtatásnál ellenőrizd, hogy a backend a 8000-es porton fut.</p>
+            <button type="button" onClick={onRetry} className="mt-5 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white active:scale-95 transition-transform">
+              Újrapróbálom
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
