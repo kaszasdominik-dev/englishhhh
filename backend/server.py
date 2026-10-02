@@ -645,15 +645,16 @@ async def live_session(request: Request):
 
     requested_duration = clamp(int(body.get('durationMinutes') or 15), 5, 60)
     subscription = state.get('subscription') or {}
-    included = max(0, int(subscription.get('includedMinutes') or 0))
-    used = max(0, int(subscription.get('usedMinutes') or 0))
-    remaining = max(0, included - used) if included > 0 else None
-    if remaining is not None and remaining <= 0:
+    included_minutes = max(0, int(subscription.get('includedMinutes') or 0))
+    legacy_used_minutes = max(0, int(subscription.get('usedMinutes') or 0))
+    used_seconds = max(0, int(subscription.get('usedSeconds') if subscription.get('usedSeconds') is not None else legacy_used_minutes * 60))
+    remaining_seconds = max(0, included_minutes * 60 - used_seconds) if included_minutes > 0 else None
+    if remaining_seconds is not None and remaining_seconds <= 0:
         return JSONResponse(
             {"error": "Elfogyott a Live perckereted.", "code": "LIVE_MINUTES_EXHAUSTED"},
             status_code=402,
         )
-    duration = min(requested_duration, max(1, remaining)) if remaining is not None else requested_duration
+    duration = min(requested_duration, max(1 / 60, remaining_seconds / 60)) if remaining_seconds is not None else requested_duration
     merged_profile = {**profile, **(body.get('profile') or {})}
     session = {
         'model': LIVE_MODEL,
@@ -1447,12 +1448,15 @@ Analyse ONLY this session. If this is a scenario session, judge whether the lear
                "transcript": transcript, "summary": result}
     state.setdefault('sessions', []).insert(0, session)
     state['sessions'] = state['sessions'][:40]
-    mins = -(-duration // 60) if duration else 0
+    actual_seconds = max(0, live_usage_seconds or duration)
+    mins = -(-actual_seconds // 60) if actual_seconds else 0
     stats = state.setdefault('stats', {})
     stats['totalMinutes'] = stats.get('totalMinutes', 0) + mins
     stats['weekMinutes'] = stats.get('weekMinutes', 0) + mins
     sub = state.setdefault('subscription', {})
-    sub['usedMinutes'] = sub.get('usedMinutes', 0) + mins
+    previous_used_seconds = int(sub.get('usedSeconds') if sub.get('usedSeconds') is not None else int(sub.get('usedMinutes') or 0) * 60)
+    sub['usedSeconds'] = max(0, previous_used_seconds + actual_seconds)
+    sub['usedMinutes'] = -(-sub['usedSeconds'] // 60) if sub['usedSeconds'] else 0
     if result.get('homework'):
         new_hw = [{"id": f"hw_{int(time.time()*1000)}_{i}", **h, "done": False} for i, h in enumerate(result['homework'])]
         state['homework'] = (new_hw + state.get('homework', []))[:12]
