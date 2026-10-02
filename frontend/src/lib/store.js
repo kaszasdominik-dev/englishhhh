@@ -97,16 +97,10 @@ export function StoreProvider({ children }) {
   }, []);
 
   const toggleHomework = useCallback(async (id, done) => {
-    let before = null;
-    setData(prev => {
-      before = prev;
-      return { ...prev, homework: (prev.homework || []).map(h => h.id === id ? { ...h, done } : h) };
-    });
     try {
       const r = await api('/homework', { method: 'POST', body: JSON.stringify({ id, done }) });
       setData(r.state);
     } catch (e) {
-      if (before) setData(before);
       toast.error(e?.message || 'Nem sikerült menteni a házit.');
     }
   }, [setData]);
