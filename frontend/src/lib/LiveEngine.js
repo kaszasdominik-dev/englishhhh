@@ -1,4 +1,4 @@
-import { API } from './api';
+import { API, clientHeaders } from './api';
 import { liveKindForTask, normalizeLearningTask, taskToLiveInstruction } from './learningTasks';
 import { LANGUAGE_MIX_META, defaultLanguageMixForCefr, defaultPaceForCefr, languageModeForMix, normalizeCefr } from './liveAdaptation';
 import {
@@ -19,7 +19,7 @@ export class LiveEngine {
   reset() {
     this.pc = null; this.dc = null; this.stream = null;
     this.phase = 'setup'; // setup|connecting|live|summary
-    this.mode = 'business'; this.teacher = 'maya'; this.sessionMinutes = 15;
+    this.mode = 'free'; this.teacher = 'maya'; this.sessionMinutes = 15;
     this.profile = {}; this.languageMix = 'mixed'; this.langMode = null; this.pace = 'normal'; this.cefrLevel = 'B1';
     this.status = 'Készen áll'; this.connectionLabel = 'Felkészülés';
     this.connected = false; this.muted = false; this.autoPaused = false; this.timeLimitReached = false;
@@ -90,7 +90,7 @@ export class LiveEngine {
   }
 
   // ---------- lifecycle ----------
-  open({ mode = 'business', teacher = 'maya', profile = {}, vocab = [], languageMix = null, langMode = null, initialTask = null, scenario = null } = {}) {
+  open({ mode = 'free', teacher = 'maya', profile = {}, vocab = [], languageMix = null, langMode = null, initialTask = null, scenario = null } = {}) {
     this.hardCleanup(false);
     this.reset();
     this.mode = mode; this.teacher = teacher; this.profile = profile; this.scenario = scenario || null;
@@ -159,7 +159,7 @@ export class LiveEngine {
       let res, payload;
       try {
         res = await fetch(`${API}/live-session`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+          method: 'POST', headers: clientHeaders({ 'Content-Type': 'application/json' }), signal: ctrl.signal,
           body: JSON.stringify({ sdp: pc.localDescription.sdp, teacher: this.teacher, mode: this.mode, scenarioId: this.scenario?.id || null, durationMinutes: this.sessionMinutes, languageMode: this.langMode, languageMix: this.languageMix, pace: this.pace, profile: this.profile, memory: this.timeline.slice(-10).map(t => `${t.role === 'user' ? 'learner' : 'tutor'}: ${t.text}`) }),
         });
         const raw = await res.text();
@@ -608,7 +608,7 @@ export class LiveEngine {
     const seq = ++this._practiceAnswerSeq;
     const direction = kind === 'meaning' ? 'en_hu' : 'hu_en';
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction, explicitLookup: true }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction, explicitLookup: true }) }).then(x => x.json());
       if (seq !== this._practiceAnswerSeq) return;
       const answer = normalizeSpeechText(r?.translation || '');
       if (answer && this.practiceTarget?.kind === kind && practiceNormAny(this.practiceTarget.text) === practiceNormAny(source)) {
@@ -660,7 +660,7 @@ export class LiveEngine {
       try {
         const r = await fetch(`${API}/word-help`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: clientHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ word: term, context: this.lastByRole.assistant?.text || term, direction: 'en_hu', explicitLookup: true }),
         }).then(x => x.json());
         if (r?.saveable === false || r?.error) return;
@@ -686,7 +686,7 @@ export class LiveEngine {
   async pronounceText(text) {
     const clean = normalizeSpeechText(text || ''); if (!clean) return;
     try {
-      const r = await fetch(`${API}/pronounce`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, teacher: this.teacher }) });
+      const r = await fetch(`${API}/pronounce`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text: clean, teacher: this.teacher }) });
       if (!r.ok) throw new Error('tts');
       const blob = await r.blob();
       try { this._pronAudio?.pause(); } catch {}
@@ -734,7 +734,7 @@ export class LiveEngine {
     if (needsLookup && !answer) {
       try {
         const direction = meaningTask ? 'en_hu' : 'hu_en';
-        const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction, explicitLookup: true }) }).then(x => x.json());
+        const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction, explicitLookup: true }) }).then(x => x.json());
         answer = normalizeSpeechText(r?.translation || '');
       } catch { /* fall through */ }
       answer = answer || pt.text;
@@ -763,7 +763,7 @@ export class LiveEngine {
     const saved = (this.cb.getVocab?.() || []).find(v => String(v.term || '').toLowerCase() === clean);
     if (!saved) return;
     try {
-      const r = await fetch(`${API}/game/result`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ term: saved.term, outcome, game: 'live_quiz' }) }).then(x => x.json());
+      const r = await fetch(`${API}/game/result`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ term: saved.term, outcome, game: 'live_quiz' }) }).then(x => x.json());
       if (r?.state) this.cb.onData?.(r.state);
     } catch { /* non-blocking */ }
   }
@@ -832,7 +832,7 @@ export class LiveEngine {
     const seq = ++this._taskEvalSeq;
     this.practiceTarget = { ...this.practiceTarget, attempted: true }; this.notify();
     try {
-      const r = await fetch(`${API}/task-eval`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, source: pt.text, expected, learnerText: said, context: this.lastByRole.assistant?.text || '' }) }).then(x => x.json());
+      const r = await fetch(`${API}/task-eval`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ kind, source: pt.text, expected, learnerText: said, context: this.lastByRole.assistant?.text || '' }) }).then(x => x.json());
       if (seq !== this._taskEvalSeq || !this.practiceTarget || this.practiceTarget.state === 'correct') return;
       const st = ['correct', 'almost_correct', 'wrong'].includes(r?.state) ? r.state : 'almost_correct';
       this.markTaskResolved(st, r?.correctAnswer || expected, r?.reason || '');
@@ -850,6 +850,9 @@ export class LiveEngine {
   latestUserTurn() { for (let i = this.timeline.length - 1; i >= 0; i--) if (this.timeline[i].role === 'user' && normalizeSpeechText(this.timeline[i].text)) return this.timeline[i]; return null; }
   scheduleTurnCheck(delay = 1100) { clearTimeout(this.turnCheckTimer); const seq = ++this.turnCheckSeq; this.turnCheckTimer = setTimeout(() => this.verifyTurn(seq), delay); }
   async verifyTurn(seq) {
+    // Dedicated drills already have their own task evaluator; a second AI verifier adds
+    // latency/cost and can produce conflicting feedback.
+    if (['vocabulary', 'grammar', 'pronunciation'].includes(this.mode)) return;
     const turn = this.latestUserTurn(); if (!turn || this.finishing || seq !== this.turnCheckSeq) return;
     if (turn.id === this.lastCheckedTurnId) return;
     const text = normalizeSpeechText(turn.text); if (!text) return;
@@ -857,7 +860,7 @@ export class LiveEngine {
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
-      const r = await fetch(`${API}/turn-check`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(x => x.json());
+      const r = await fetch(`${API}/turn-check`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(x => x.json());
       if (seq !== this.turnCheckSeq) return;
       this.lastCheckedTurnId = turn.id;
       if (r?.shouldCorrect && Number(r.confidence) >= 0.9 && r.corrected && r.original) this.showCorrection(`${r.original} → ${r.corrected}`, r.reason || 'Pontos javítás.');
@@ -987,7 +990,7 @@ export class LiveEngine {
     if (/(almost|close|not quite|try again|majdnem|nem egészen|javíts|hangsúly)/i.test(t)) status = 'needs_work';
     else if (/(exactly|perfect|correct|spot on|igen[,! ]|jól ejt|teljesen jó|helyes)/i.test(t)) status = 'correct';
     const context = this.timeline.slice(-6).map(x => `${x.role}: ${x.text}`).join('\n');
-    fetch(`${API}/pronunciation-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attempt: p.attempt, userText: p.userText, assistantText: normalizeSpeechText(assistantText), tutorStatus: status, context }) })
+    fetch(`${API}/pronunciation-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ attempt: p.attempt, userText: p.userText, assistantText: normalizeSpeechText(assistantText), tutorStatus: status, context }) })
       .then(x => x.json()).then(r => { this.pronunciation = r; this.notify(); }).catch(() => {
         this.pronunciation = { status, heard: p.attempt || '—', target: 'Hallgasd meg újra', hint: '', ipa: '', note: 'A részletes kiejtési kártya most nem töltődött be.' }; this.notify();
       });
@@ -1008,7 +1011,7 @@ export class LiveEngine {
     if (saved) { this.wordPopover = { word: saved.term, translation: saved.meaning, explanation: 'Már benne van a Szavaim között.', contextMeaning: saved.example || '', saved: true }; this.notify(); return; }
     this.wordPopover = { word, loading: true }; this.notify();
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word, context: context || this.caption.text || this.lastByRole.assistant?.text || '', explicitLookup: true, direction: 'auto' }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word, context: context || this.caption.text || this.lastByRole.assistant?.text || '', explicitLookup: true, direction: 'auto' }) }).then(x => x.json());
       if (r?.saveable === false || r?.error) throw new Error(r?.error || 'not saveable');
       this.wordPopover = { word: r.source || word, translation: r.translation || '', explanation: r.explanation || '', contextMeaning: r.contextMeaning || '', sourceLanguage: r.sourceLanguage || 'en', saved: false };
     } catch (e) {
@@ -1048,7 +1051,7 @@ export class LiveEngine {
   async savePracticeTarget() {
     const target = this.practiceTarget?.text; if (!target) return;
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word: target, context: this.lastByRole.assistant?.text || target, explicitLookup: true, direction: 'en_hu', selectionMode: 'phrase' }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: target, context: this.lastByRole.assistant?.text || target, explicitLookup: true, direction: 'en_hu', selectionMode: 'phrase' }) }).then(x => x.json());
       if (r?.saveable === false) throw new Error('not saveable');
       const w = await this.cb.saveVocab?.({ term: r.source || target, meaning: r.translation || '', example: r.contextMeaning || '', saved: true, source: 'practice_target', sourceLanguage: 'en' });
       if (w) { this.practiceTarget = { ...this.practiceTarget, saved: true }; this.notify(); }
@@ -1105,19 +1108,30 @@ export class LiveEngine {
   autoPause() {
     if (this.autoPaused || !this.connected) return;
     this.autoPaused = true; this.timerPaused = true; clearTimeout(this.idleTimer);
-    this.stream?.getAudioTracks().forEach(t => (t.enabled = false));
-    this.send({ type: 'session.input_audio.mute', event_id: rid('idle_pause') });
+    this.usageOffset = this.usageSeconds || this.usageOffset || 0;
+    this.status = 'Szüneteltetve';
+    this.connectionLabel = 'Szünet';
+    this.preferenceBadge = 'SZÜNET · Live kapcsolat lezárva';
     try { this.audioEl()?.pause(); } catch {}
-    this.status = 'Szüneteltetve'; this.preferenceBadge = 'SZÜNET · mikrofon kikapcsolva'; this.notify();
+    // A muted Live session can still cost money. Close the transport completely and
+    // recreate it only when the learner resumes.
+    this.disconnectTransport(true);
+    this.notify();
   }
-  resumeFromPause() {
-    if (!this.autoPaused) return;
-    this.autoPaused = false; this.timerPaused = false; this.muted = false;
-    this.stream?.getAudioTracks().forEach(t => (t.enabled = true));
-    this.send({ type: 'session.input_audio.unmute', event_id: rid('idle_resume') });
-    this.ensureTutorAudible();
-    this.preferenceBadge = '';
-    this.status = 'Hallgatlak…'; this.markActivity(); this.scheduleInactivityPause(); this.notify();
+  async resumeFromPause() {
+    if (!this.autoPaused || this.finishing || this.timeLimitReached) return;
+    this.autoPaused = false; this.timerPaused = true; this.muted = false;
+    this.reconnecting = true; this.reconnectFailed = false; this.resumeAfterReconnect = true;
+    this.preferenceBadge = 'FOLYTATÁS…';
+    this.status = 'Kapcsolódás…'; this.connectionLabel = 'Újracsatlakozás…'; this.notify();
+    const ok = await this.connect(true);
+    if (!ok) {
+      this.reconnecting = false; this.reconnectFailed = true; this.autoPaused = true;
+      this.preferenceBadge = 'SZÜNET';
+      this.status = 'Nem sikerült folytatni'; this.connectionLabel = 'Kapcsolat nélkül'; this.notify();
+      return;
+    }
+    this.markActivity();
   }
   scheduleIdleNudge(delay = 6500) {
     clearTimeout(this.idleTimer);
@@ -1213,7 +1227,7 @@ export class LiveEngine {
     this.notify();
     const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 14000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
       this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
