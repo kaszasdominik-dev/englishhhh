@@ -465,6 +465,12 @@ function WordLab({ data, onPlay }) {
         <p className="text-sm text-slate-300 mt-1">A csomagot a helyi angol–magyar szótár és a saját szinted alapján válogatjuk. Gyors, kiszámítható, tokenmentes.</p>
       </div>
 
+      {dictStatus && !dictStatus.ready && (
+        <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">
+          A helyi szótár még nincs teljesen betöltve. A Word Lab addig nem minden témánál fog működni.
+        </div>
+      )}
+
       <div>
         <div className="text-xs font-semibold text-ink-mute mb-2">Téma</div>
         <div className="flex gap-2 overflow-x-auto livo-scroll pb-1">
@@ -506,9 +512,17 @@ function WordLab({ data, onPlay }) {
 }
 
 function GrammarPane({ data }) {
+  const items = data?.grammar || [];
   return (
     <div className="space-y-3">
-      {(data?.grammar || []).map((g, i) => (
+      {items.length === 0 && (
+        <div className="rounded-2xl bg-white p-6 text-center shadow-soft ring-1 ring-slate-100">
+          <Wand2 size={22} className="mx-auto text-brand" />
+          <b className="block text-sm text-ink mt-2">Még nincs visszatérő nyelvtani hibád.</b>
+          <p className="text-xs text-ink-mute mt-1">Beszélgess a Live tanárral; az órákból ide kerülnek azok a minták, amelyeket tényleg érdemes gyakorolnod.</p>
+        </div>
+      )}
+      {items.map((g, i) => (
         <div key={i} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-100">
           <div className="flex items-center justify-between"><small className="text-xs text-ink-mute">{g.mastery}% · {g.trend}</small><span className="text-xs font-semibold text-brand">{g.title}</span></div>
           <p className="text-sm text-rose2 line-through mt-2">{g.original}</p>
