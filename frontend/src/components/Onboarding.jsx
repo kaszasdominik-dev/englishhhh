@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TeacherAvatar } from '@/components/TeacherAvatar';
 import { useStore } from '@/lib/store';
 import { TEACHERS, TEACHER_IDS } from '@/lib/livo';
 import { ArrowRight, ArrowLeft, Play, Check } from 'lucide-react';
@@ -107,7 +108,7 @@ export function Onboarding({ onDone }) {
                 return (
                   <button type="button" disabled={saving} key={id} data-testid={`onb-teacher-${id}`} onClick={() => setTeacher(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer disabled:opacity-60 ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
                     {sel && <span className="absolute top-2 right-2 h-5 w-5 rounded-full bg-brand text-white grid place-items-center"><Check size={12} /></span>}
-                    <img alt={t.name} src={t.img} className="h-16 w-16 rounded-2xl object-cover bg-slate-100" />
+                    <TeacherAvatar teacher={t} className="h-16 w-16 rounded-2xl" />
                     <div className="mt-2 font-heading font-bold text-ink flex items-center gap-1.5">{t.name}<span className="text-[9px] font-bold text-brand bg-brand-soft rounded-full px-1.5 py-0.5">{t.badge}</span></div>
                     <p className="text-[11px] text-ink-mute leading-tight mt-0.5">{t.desc}</p>
                     <blockquote className="text-[11px] italic text-ink-soft mt-1.5">{t.quote}</blockquote>
