@@ -44,24 +44,31 @@ export function Onboarding({ onDone }) {
   const [path, setPath] = useState(data?.profile?.learningPath === 'guided' ? 'guided' : 'conversation');
   const [level, setLevel] = useState(data?.profile?.cefr || '');
   const [placementOpen, setPlacementOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const finish = async (cefr, placement = null, source = 'self_reported') => {
+    if (saving) return;
+    setSaving(true);
     const cleanLevel = cefr === 'C1+' ? 'C1' : cefr;
-    await saveProfile({
-      profile: {
-        teacher,
-        learningPath: path,
-        cefr: cleanLevel || 'B1',
-        placement: placement || {
-          source,
+    try {
+      const saved = await saveProfile({
+        profile: {
+          teacher,
+          learningPath: path,
           cefr: cleanLevel || 'B1',
-          completedAt: new Date().toISOString(),
-          note: 'A felhasználó által megadott becsült szint.',
+          placement: placement || {
+            source,
+            cefr: cleanLevel || 'B1',
+            completedAt: new Date().toISOString(),
+            note: 'A felhasználó által megadott becsült szint.',
+          },
         },
-      },
-      user: { onboarded: true },
-    }, true);
-    onDone?.();
+        user: { onboarded: true },
+      }, true);
+      if (saved) onDone?.();
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (placementOpen) {
@@ -98,7 +105,7 @@ export function Onboarding({ onDone }) {
               {TEACHER_IDS.map(id => {
                 const t = TEACHERS[id]; const sel = teacher === id;
                 return (
-                  <div role="button" tabIndex={0} key={id} data-testid={`onb-teacher-${id}`} onClick={() => setTeacher(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
+                  <div role="button" tabIndex={0} key={id} data-testid={`onb-teacher-${id}`} onClick={() => !saving && setTeacher(id)} className={`relative text-left rounded-2xl p-3 transition-all cursor-pointer ${sel ? 'ring-2 ring-brand bg-brand-soft' : 'ring-1 ring-slate-200 bg-white'}`}>
                     {sel && <span className="absolute top-2 right-2 h-5 w-5 rounded-full bg-brand text-white grid place-items-center"><Check size={12} /></span>}
                     <img alt={t.name} src={t.img} className="h-16 w-16 rounded-2xl object-cover bg-slate-100" />
                     <div className="mt-2 font-heading font-bold text-ink flex items-center gap-1.5">{t.name}<span className="text-[9px] font-bold text-brand bg-brand-soft rounded-full px-1.5 py-0.5">{t.badge}</span></div>
@@ -175,8 +182,8 @@ export function Onboarding({ onDone }) {
               <span className="block text-xs text-slate-300 mt-1">Adaptív nyelvtan · szókincs · olvasás · hallásértés</span>
             </button>
 
-            <button data-testid="onb-finish" disabled={!level} onClick={() => finish(level)} className="mt-6 w-full rounded-full bg-brand text-white font-semibold py-3.5 inline-flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40">
-              Kezdjük <ArrowRight size={16} />
+            <button data-testid="onb-finish" disabled={!level || saving} onClick={() => finish(level)} className="mt-6 w-full rounded-full bg-brand text-white font-semibold py-3.5 inline-flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40">
+              {saving ? 'Mentés…' : 'Kezdjük'} {!saving && <ArrowRight size={16} />}
             </button>
           </div>
         )}
