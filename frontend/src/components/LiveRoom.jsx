@@ -18,6 +18,7 @@ export function LiveRoom({ engine }) {
   const t = TEACHERS[s.teacher] || TEACHERS.james;
   const [showTranscript, setShowTranscript] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#0B1120] text-white flex flex-col overflow-hidden" data-testid="live-room">
@@ -26,7 +27,10 @@ export function LiveRoom({ engine }) {
 
       {/* Header */}
       <header className="relative flex items-center justify-between px-5 pt-5 pb-3">
-        <button data-testid="live-close" onClick={() => engine.end()} className="h-9 w-9 grid place-items-center rounded-full bg-white/10 active:scale-90 transition-transform"><X size={18} /></button>
+        <button data-testid="live-close" aria-label="Óra bezárása" onClick={() => {
+          if (s.connected && s.phase === 'live') setConfirmEnd(true);
+          else engine.end();
+        }} className="h-9 w-9 grid place-items-center rounded-full bg-white/10 active:scale-90 transition-transform"><X size={18} /></button>
         <div className="flex items-center gap-2.5">
           <img alt={t.name} src={t.img} className="h-9 w-9 rounded-full object-cover ring-2 ring-white/20" />
           <div className="leading-none">
@@ -198,12 +202,38 @@ export function LiveRoom({ engine }) {
                   {s.muted ? <MicOff size={28} /> : <Mic size={28} />}
                 </button>
               )}
-              <button className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-slate-300" disabled>◉</button>
+              <button
+                data-testid="live-pause"
+                aria-label="Óra szüneteltetése"
+                onClick={() => engine.autoPause()}
+                className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-slate-300 active:scale-90 transition-transform disabled:opacity-30"
+                disabled={!s.connected || s.phase !== 'live'}
+                title="Szünet"
+              ><Pause size={20} /></button>
             </div>
             <p className="text-center text-[10px] text-slate-500 mt-3">AI-generált hang · a szóra koppintva jelentés + mentés</p>
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {confirmEnd && (
+          <motion.div
+            data-testid="live-end-confirm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[70] grid place-items-center bg-[#0B1120]/85 backdrop-blur-sm p-6"
+          >
+            <motion.div initial={{ scale: 0.94, y: 8 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm rounded-[1.75rem] bg-[#151D30] p-5 text-center ring-1 ring-white/10">
+              <h2 className="font-heading text-xl font-extrabold text-white">Lezárod az órát?</h2>
+              <p className="mt-2 text-sm text-slate-400">Az eddigi beszélgetésből elkészítjük az összegzést. Ha csak megállnál, használd inkább a szünet gombot.</p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setConfirmEnd(false)} className="rounded-full bg-white/10 py-3 text-sm font-semibold text-white">Maradok</button>
+                <button type="button" onClick={() => { setConfirmEnd(false); engine.end(); }} className="rounded-full bg-rose-500 py-3 text-sm font-semibold text-white">Óra lezárása</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Reconnect overlay */}
       <AnimatePresence>
