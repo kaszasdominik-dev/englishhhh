@@ -55,6 +55,7 @@ async def bind_client_context(request: Request, call_next):
     raw = str(request.headers.get("X-Livo-Client") or "demo-user").strip()
     client_id = raw if re.match(r"^[A-Za-z0-9_-]{8,80}$", raw) else "demo-user"
     token = _client_id_ctx.set(client_id)
+    request_id = str(request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16])
     try:
         limit = _route_rate_limit(request.url.path)
         if limit and request.method != 'OPTIONS':
@@ -78,12 +79,23 @@ async def bind_client_context(request: Request, call_next):
                     else: _rate_events.pop(k, None)
 
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), geolocation=()"
         return response
     finally:
         _client_id_ctx.reset(token)
+
+@app.exception_handler(Exception)
+async def unhandled_exception(request: Request, exc: Exception):
+    request_id = str(request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16])
+    logger.exception("Unhandled API error request_id=%s path=%s", request_id, request.url.path)
+    return JSONResponse(
+        {"error": "Váratlan szerverhiba történt. Próbáld újra.", "code": "INTERNAL_ERROR", "requestId": request_id},
+        status_code=500,
+        headers={"X-Request-ID": request_id},
+    )
 
 # ------------------------------------------------------------------ personas
 teachers = {
