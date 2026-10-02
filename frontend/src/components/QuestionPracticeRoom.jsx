@@ -106,8 +106,17 @@ export default function QuestionPracticeRoom({ defaultLevel = 'B1' }) {
           </button>;
         })}
       </div>
-      {checked && <div className={'mt-4 rounded-xl p-3 text-sm ' + (selected===q.correctAnswer?'bg-emerald-50 text-emerald-800':'bg-rose-50 text-rose-800')}>
-        <b>{selected===q.correctAnswer?'Helyes.':'Nem ez a jó válasz.'}</b>
+      {checked && <div className={'mt-4 rounded-2xl p-4 text-sm text-center ' + (selected===q.correctAnswer?'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200':'bg-rose-50 text-rose-800 ring-1 ring-rose-200')}>
+        {selected===q.correctAnswer ? (
+          <>
+            <span className="mx-auto h-16 w-16 rounded-full bg-emerald-500 text-white grid place-items-center shadow-soft">
+              <Check size={36} strokeWidth={3.2}/>
+            </span>
+            <b className="block text-lg mt-2">Helyes!</b>
+          </>
+        ) : (
+          <b className="block text-base">Nem ez a jó válasz.</b>
+        )}
         <p className="text-xs mt-1">{q.explanationHu}</p>
       </div>}
     </section>
