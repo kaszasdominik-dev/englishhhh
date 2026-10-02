@@ -1,4 +1,4 @@
-import { API, clientHeaders } from './api';
+import { API, clientHeaders, readJsonResponse } from './api';
 import { liveKindForTask, normalizeLearningTask, taskToLiveInstruction } from './learningTasks';
 import { LANGUAGE_MIX_META, defaultLanguageMixForCefr, defaultPaceForCefr, languageModeForMix, normalizeCefr } from './liveAdaptation';
 import {
@@ -267,7 +267,7 @@ export class LiveEngine {
     if (this._iceServers) return this._iceServers;
     const fallback = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
     try {
-      const cfg = await fetch(`${API}/rtc-config`).then(r => r.json());
+      const cfg = await fetch(`${API}/rtc-config`).then(readJsonResponse);
       this._iceServers = (cfg && Array.isArray(cfg.iceServers) && cfg.iceServers.length) ? cfg.iceServers : fallback;
     } catch { this._iceServers = fallback; }
     return this._iceServers;
@@ -616,7 +616,7 @@ export class LiveEngine {
     const seq = ++this._practiceAnswerSeq;
     const direction = kind === 'meaning' ? 'en_hu' : 'hu_en';
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction, explicitLookup: true }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: source, context: this.lastByRole.assistant?.text || source, direction, explicitLookup: true }) }).then(readJsonResponse);
       if (seq !== this._practiceAnswerSeq) return;
       const answer = normalizeSpeechText(r?.translation || '');
       if (answer && this.practiceTarget?.kind === kind && practiceNormAny(this.practiceTarget.text) === practiceNormAny(source)) {
@@ -670,7 +670,7 @@ export class LiveEngine {
           method: 'POST',
           headers: clientHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ word: term, context: this.lastByRole.assistant?.text || term, direction: 'en_hu', explicitLookup: true }),
-        }).then(x => x.json());
+        }).then(readJsonResponse);
         if (r?.saveable === false || r?.error) return;
         meaning = normalizeSpeechText(r?.translation || '');
       } catch { return; }
@@ -742,7 +742,7 @@ export class LiveEngine {
     if (needsLookup && !answer) {
       try {
         const direction = meaningTask ? 'en_hu' : 'hu_en';
-        const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction, explicitLookup: true }) }).then(x => x.json());
+        const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: pt.text, context: this.lastByRole.assistant?.text || pt.text, direction, explicitLookup: true }) }).then(readJsonResponse);
         answer = normalizeSpeechText(r?.translation || '');
       } catch { /* fall through */ }
       answer = answer || pt.text;
@@ -771,7 +771,7 @@ export class LiveEngine {
     const saved = (this.cb.getVocab?.() || []).find(v => String(v.term || '').toLowerCase() === clean);
     if (!saved) return;
     try {
-      const r = await fetch(`${API}/game/result`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ term: saved.term, outcome, game: 'live_quiz' }) }).then(x => x.json());
+      const r = await fetch(`${API}/game/result`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ term: saved.term, outcome, game: 'live_quiz' }) }).then(readJsonResponse);
       if (r?.state) this.cb.onData?.(r.state);
     } catch { /* non-blocking */ }
   }
@@ -840,7 +840,7 @@ export class LiveEngine {
     const seq = ++this._taskEvalSeq;
     this.practiceTarget = { ...this.practiceTarget, attempted: true }; this.notify();
     try {
-      const r = await fetch(`${API}/task-eval`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ kind, source: pt.text, expected, learnerText: said, context: this.lastByRole.assistant?.text || '' }) }).then(x => x.json());
+      const r = await fetch(`${API}/task-eval`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ kind, source: pt.text, expected, learnerText: said, context: this.lastByRole.assistant?.text || '' }) }).then(readJsonResponse);
       if (seq !== this._taskEvalSeq || !this.practiceTarget || this.practiceTarget.state === 'correct') return;
       const st = ['correct', 'almost_correct', 'wrong'].includes(r?.state) ? r.state : 'almost_correct';
       this.markTaskResolved(st, r?.correctAnswer || expected, r?.reason || '');
@@ -868,7 +868,7 @@ export class LiveEngine {
     const ctrl = new AbortController(); this.turnCheckAbort = ctrl;
     try {
       const prev = [...this.timeline].slice(0, -1).reverse().find(x => x.role === 'assistant')?.text || '';
-      const r = await fetch(`${API}/turn-check`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(x => x.json());
+      const r = await fetch(`${API}/turn-check`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ text, mode: this.mode, teacher: this.teacher, previousAssistant: prev }) }).then(readJsonResponse);
       if (seq !== this.turnCheckSeq) return;
       this.lastCheckedTurnId = turn.id;
       if (r?.shouldCorrect && Number(r.confidence) >= 0.9 && r.corrected && r.original) this.showCorrection(`${r.original} → ${r.corrected}`, r.reason || 'Pontos javítás.');
@@ -937,7 +937,7 @@ export class LiveEngine {
       }
 
       const r = await fetch(`${API}/scenario/live-check`, {
-        method:'POST', signal:ctrl.signal, headers:{'Content-Type':'application/json'},
+        method:'POST', credentials:'include', signal:ctrl.signal, headers:clientHeaders({'Content-Type':'application/json'}),
         body:JSON.stringify({
           scenarioId:this.scenario.id, stepIndex:this.situationStepIndex, learnerText:text,
           previousAssistant:prev, frustration:this.situationFrustration,
@@ -999,7 +999,7 @@ export class LiveEngine {
     else if (/(exactly|perfect|correct|spot on|igen[,! ]|jól ejt|teljesen jó|helyes)/i.test(t)) status = 'correct';
     const context = this.timeline.slice(-6).map(x => `${x.role}: ${x.text}`).join('\n');
     fetch(`${API}/pronunciation-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ attempt: p.attempt, userText: p.userText, assistantText: normalizeSpeechText(assistantText), tutorStatus: status, context }) })
-      .then(x => x.json()).then(r => { this.pronunciation = r; this.notify(); }).catch(() => {
+      .then(readJsonResponse).then(r => { this.pronunciation = r; this.notify(); }).catch(() => {
         this.pronunciation = { status, heard: p.attempt || '—', target: 'Hallgasd meg újra', hint: '', ipa: '', note: 'A részletes kiejtési kártya most nem töltődött be.' }; this.notify();
       });
   }
@@ -1019,7 +1019,7 @@ export class LiveEngine {
     if (saved) { this.wordPopover = { word: saved.term, translation: saved.meaning, explanation: 'Már benne van a Szavaim között.', contextMeaning: saved.example || '', saved: true }; this.notify(); return; }
     this.wordPopover = { word, loading: true }; this.notify();
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word, context: context || this.caption.text || this.lastByRole.assistant?.text || '', explicitLookup: true, direction: 'auto' }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word, context: context || this.caption.text || this.lastByRole.assistant?.text || '', explicitLookup: true, direction: 'auto' }) }).then(readJsonResponse);
       if (r?.saveable === false || r?.error) throw new Error(r?.error || 'not saveable');
       this.wordPopover = { word: r.source || word, translation: r.translation || '', explanation: r.explanation || '', contextMeaning: r.contextMeaning || '', sourceLanguage: r.sourceLanguage || 'en', saved: false };
     } catch (e) {
@@ -1059,7 +1059,7 @@ export class LiveEngine {
   async savePracticeTarget() {
     const target = this.practiceTarget?.text; if (!target) return;
     try {
-      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: target, context: this.lastByRole.assistant?.text || target, explicitLookup: true, direction: 'en_hu', selectionMode: 'phrase' }) }).then(x => x.json());
+      const r = await fetch(`${API}/word-help`, { method: 'POST', credentials: 'include', headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ word: target, context: this.lastByRole.assistant?.text || target, explicitLookup: true, direction: 'en_hu', selectionMode: 'phrase' }) }).then(readJsonResponse);
       if (r?.saveable === false) throw new Error('not saveable');
       const w = await this.cb.saveVocab?.({ term: r.source || target, meaning: r.translation || '', example: r.contextMeaning || '', saved: true, source: 'practice_target', sourceLanguage: 'en' });
       if (w) { this.practiceTarget = { ...this.practiceTarget, saved: true }; this.notify(); }
@@ -1242,7 +1242,7 @@ export class LiveEngine {
     this.notify();
     const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 14000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(x => x.json());
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(readJsonResponse);
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
       this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
