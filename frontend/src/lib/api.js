@@ -42,6 +42,26 @@ function friendlyNetworkError(err) {
   return new Error('Nincs internetkapcsolat. Csatlakozz a hálózathoz, majd próbáld újra.');
 }
 
+export async function readJsonResponse(res) {
+  const raw = await res.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(res.ok
+      ? 'A szerver hibás formátumú választ adott.'
+      : `A szerver hibát adott vissza (HTTP ${res.status}).`);
+  }
+  if (!res.ok) {
+    const msg = data?.error?.message || data?.error || data?.detail || data?.message || `HTTP ${res.status}`;
+    const err = new Error(String(msg).slice(0, 500));
+    err.code = data?.code;
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 export async function api(path, options = {}) {
   const externalSignal = options.signal;
   const controller = externalSignal ? null : new AbortController();
