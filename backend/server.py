@@ -52,8 +52,21 @@ def _route_rate_limit(path):
 
 @app.middleware("http")
 async def bind_client_context(request: Request, call_next):
-    raw = str(request.headers.get("X-Livo-Client") or "demo-user").strip()
-    client_id = raw if re.match(r"^[A-Za-z0-9_-]{8,80}$", raw) else "demo-user"
+    # Anonymous guest sessions are isolated with an HttpOnly cookie. The legacy
+    # X-Livo-Client value is accepted only as a migration seed when no cookie exists.
+    cookie_id = str(request.cookies.get("livo_session") or "").strip()
+    header_id = str(request.headers.get("X-Livo-Client") or "").strip()
+    valid = lambda value: bool(re.match(r"^[A-Za-z0-9_-]{8,80}$", value or ""))
+    if valid(cookie_id):
+        client_id = cookie_id
+        set_guest_cookie = False
+    elif valid(header_id):
+        client_id = header_id
+        set_guest_cookie = True
+    else:
+        client_id = f"guest_{uuid.uuid4().hex}"
+        set_guest_cookie = True
+
     token = _client_id_ctx.set(client_id)
     request_id = str(request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16])
     try:
@@ -79,6 +92,17 @@ async def bind_client_context(request: Request, call_next):
                     else: _rate_events.pop(k, None)
 
         response = await call_next(request)
+        if set_guest_cookie:
+            forwarded_proto = str(request.headers.get("X-Forwarded-Proto") or request.url.scheme).lower()
+            response.set_cookie(
+                "livo_session",
+                client_id,
+                max_age=60 * 60 * 24 * 365,
+                httponly=True,
+                secure=forwarded_proto == "https",
+                samesite="lax",
+                path="/",
+            )
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
