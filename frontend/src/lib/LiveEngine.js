@@ -53,7 +53,7 @@ export class LiveEngine {
     this.situationHelpUsed = 0; this.situationHelpArmed = false; this.situationClearHelpAfterResponse = false;
     this.situationFrustration = 0; this.situationTurnCount = 0; this.situationFinished = false;
     this.situationMistakes = []; this.situationPendingOpening = ''; this.situationFinishQueued = false; this.situationFinishAfterResponse = false;
-    this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null;
+    this.summarySeq = 0; this.summaryAbort = null; this.connectWatch = null; this._transportSeq = 0;
     this.diag = [];
   }
 
@@ -152,7 +152,8 @@ export class LiveEngine {
         }
       };
       const dc = pc.createDataChannel('oai-events'); this.dc = dc;
-      dc.addEventListener('message', (m) => this.handleEvent(m));
+      const transportSeq = ++this._transportSeq;
+      dc.addEventListener('message', (m) => this.handleEvent(m, transportSeq));
       dc.addEventListener('open', () => { this.connectionLabel = 'Kapcsolódva'; this.notify(); });
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer); await this.waitIce(pc);
       const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 12000);
@@ -338,7 +339,8 @@ export class LiveEngine {
     this.timeline = [...this.timeline, turn]; this.lastByRole.user = turn; this.notify(); return turn;
   }
 
-  handleEvent(msg) {
+  handleEvent(msg, transportSeq = this._transportSeq) {
+    if (transportSeq !== this._transportSeq) return;
     let d; try { d = JSON.parse(msg.data); } catch { return; }
     const type = d.type || d?.response?.event?.type || '';
     const ev = d?.response?.event || d;
@@ -453,7 +455,10 @@ export class LiveEngine {
     if (type === 'session.usage.updated' && ev.usage?.seconds != null) this.usageSeconds = (this.usageOffset || 0) + (Number(ev.usage.seconds) || 0);
     if (type === 'session.input_audio.muted') { this.status = 'Mikrofon némítva'; this.notify(); }
     if (type === 'session.input_audio.unmuted') { this.status = 'Hallgatlak…'; this.notify(); }
-    if (type === 'session.closed') { this.connected = false; this.assistantSpeaking = false; this.userSpeaking = false; this.notify(); }
+    if (type === 'session.closed') {
+      if (ev.usage?.seconds != null) this.usageSeconds = Math.max(this.usageSeconds || 0, (this.usageOffset || 0) + (Number(ev.usage.seconds) || 0));
+      this.connected = false; this.assistantSpeaking = false; this.userSpeaking = false; this.notify();
+    }
     if (/error/i.test(type)) { this.manualResponseInFlight = false; if (this.greetingPhase === 'pending') this.greetingPhase = 'idle'; }
   }
 
@@ -1219,9 +1224,18 @@ export class LiveEngine {
 
   disconnectTransport(sendClose = true) {
     this.clearResponseFallback(); clearTimeout(this.idleTimer); clearTimeout(this.inactivityTimer); clearTimeout(this.greetingWatch); clearTimeout(this.connectWatch); this.cancelTurnCheck(); this.stopMicMonitor();
-    if (sendClose && this.dc?.readyState === 'open') { try { this.dc.send(JSON.stringify({ type: 'session.close', event_id: rid('close') })); } catch {} }
-    this.stream?.getTracks().forEach(t => t.stop());
-    try { this.dc?.close(); } catch {} try { this.pc?.close(); } catch {}
+    const pc = this.pc, dc = this.dc, stream = this.stream;
+    const canGracefullyClose = sendClose && dc?.readyState === 'open';
+    if (canGracefullyClose) {
+      try { dc.send(JSON.stringify({ type: 'session.close', event_id: rid('close') })); } catch {}
+    }
+    // Release microphone immediately, but keep WebRTC/data channel alive briefly so GPT-Live can
+    // emit session.closed with final usage before transport cleanup.
+    stream?.getTracks().forEach(t => t.stop());
+    const closeCaptured = () => { try { dc?.close(); } catch {} try { pc?.close(); } catch {} };
+    if (canGracefullyClose) setTimeout(closeCaptured, 900);
+    else closeCaptured();
+
     this.pc = this.dc = this.stream = null; this.connected = false; this.assistantSpeaking = false; this.userSpeaking = false; this.serverSpeechActive = false;
     this.greetingRequested = false; this.greetingPhase = 'idle'; this.manualResponseInFlight = false; this.orb = 'idle';
   }
@@ -1252,9 +1266,9 @@ export class LiveEngine {
     this.summaryLoading = true; this.phase = 'summary';
     this.hardCleanup(true);
     this.notify();
-    const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 14000);
+    const ctrl = new AbortController(); this.summaryAbort = ctrl; const to = setTimeout(() => ctrl.abort(), 30000);
     try {
-      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(readJsonResponse);
+      const r = await fetch(`${API}/session/analyze`, { method: 'POST', signal: ctrl.signal, headers: clientHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ teacher, mode, scenarioId: this.scenario?.id || null, durationSeconds: duration, liveUsageSeconds: Math.max(0, Math.round(this.usageSeconds || 0)), transcript, observedMistakes: this.situationMistakes || [], baselineVocabulary: this.baselineVocab }) }).then(readJsonResponse);
       if (seq !== this.summarySeq) return;
       this.cb.onData?.(r.state);
       this.summary = { ...r.analysis, teacher, mode, scenarioId: this.scenario?.id || null, scenarioTitle: this.scenario?.title || '', instant: false }; this.summaryLoading = false; this.notify();
